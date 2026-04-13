@@ -1,0 +1,6 @@
+{
+  "name": "中職票房分析",
+  "description": "CPBL 觀眾人數分析儀表板，支援 PWA 與圖表呈現",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

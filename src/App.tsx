@@ -1,0 +1,433 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { generateMockData, GameData } from './mockData';
+import { Settings, BarChart2, CloudRain, Thermometer, Users } from 'lucide-react';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+type ViewMode = 'homeTeam' | 'stadium';
+type SortMode = 'date' | 'audienceDesc' | 'tempDesc' | 'rainAsc';
+
+export default function App() {
+  const [gasUrl, setGasUrl] = useState('https://script.google.com/macros/s/AKfycbyGtfNgLdduKu5UfeSj5tVo4A3OmJQy_5s4B33BsPTpJ8z_eK0hYH01bED-UJ08mKV4/exec');
+  const [rawData, setRawData] = useState<GameData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [viewMode, setViewMode] = useState<ViewMode>('homeTeam');
+  const [selectedOption, setSelectedOption] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>('All');
+  const [selectedStadiumFilter, setSelectedStadiumFilter] = useState<string>('All');
+  const [sortMode, setSortMode] = useState<SortMode>('date');
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Reset filters when view mode changes
+  useEffect(() => {
+    setSelectedYear('All');
+    setSelectedStadiumFilter('All');
+    setSelectedOption(''); // Reset selected option to trigger auto-select
+  }, [viewMode]);
+
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (!gasUrl) {
+          // Use mock data
+          const mock = generateMockData();
+          const flatData = Object.values(mock).flat();
+          // Use Date + GameSno to prevent collisions
+          const uniqueData = Array.from(new Map(flatData.map(item => [`${item.Date}-${item.GameSno}`, item])).values());
+          setRawData(uniqueData);
+        } else {
+          const response = await fetch(gasUrl);
+          if (!response.ok) throw new Error('Network response was not ok');
+          const data = await response.json();
+          const flatData = Object.values(data).flat() as GameData[];
+          // Use Date + GameSno to prevent 2024 and 2025 games from overwriting each other
+          const uniqueData = Array.from(new Map(flatData.map(item => [`${item.Date}-${item.GameSno}`, item])).values());
+          
+          // Ensure numeric values
+          const processedData = uniqueData.map(item => ({
+            ...item,
+            Audience: Number(item.Audience) || 0,
+            'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
+            'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
+          }));
+          
+          setRawData(processedData);
+        }
+      } catch (err: any) {
+        let errorMessage = '無法載入資料，請檢查網址或網路連線。';
+        if (err.message === 'Failed to fetch') {
+          errorMessage = '取得資料失敗 (Failed to fetch)。請確認：\n1. GAS 網址是否正確\n2. GAS 部署時「誰可以存取」是否設定為「所有人 (Anyone)」\n3. 網址是否支援跨域請求 (CORS)';
+        } else if (err instanceof Error) {
+          errorMessage = `錯誤: ${err.message}`;
+        }
+        setError(errorMessage);
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [gasUrl]);
+
+  // Extract options based on view mode
+  const options = useMemo(() => {
+    if (rawData.length === 0) return [];
+    const set = new Set<string>();
+    rawData.forEach(game => {
+      if (viewMode === 'homeTeam' && game.HomeTeam) set.add(game.HomeTeam);
+      if (viewMode === 'stadium' && game.Stadium) set.add(game.Stadium);
+    });
+    const sortedOptions = Array.from(set).sort();
+    
+    // Auto-select first option if current selection is invalid
+    if (!sortedOptions.includes(selectedOption) && sortedOptions.length > 0) {
+      setSelectedOption(sortedOptions[0]);
+    }
+    
+    return sortedOptions;
+  }, [rawData, viewMode, selectedOption]);
+
+  // Extract available years
+  const availableYears = useMemo(() => {
+    const years = new Set(rawData.map(d => {
+      const match = d.Date.match(/^(\d{4})/);
+      return match ? match[1] : '';
+    }).filter(Boolean));
+    return ['All', ...Array.from(years).sort((a, b) => b.localeCompare(a))];
+  }, [rawData]);
+
+  // Extract available stadiums for the selected team
+  const availableStadiumsForTeam = useMemo(() => {
+    if (viewMode !== 'homeTeam' || !selectedOption) return ['All'];
+    const stadiums = new Set(rawData.filter(d => d.HomeTeam === selectedOption).map(d => d.Stadium));
+    return ['All', ...Array.from(stadiums).sort()];
+  }, [rawData, viewMode, selectedOption]);
+
+  // Filter and sort data
+  const chartData = useMemo(() => {
+    let filtered = rawData.filter(game => {
+      const matchView = viewMode === 'homeTeam' ? game.HomeTeam === selectedOption : game.Stadium === selectedOption;
+      if (!matchView) return false;
+
+      const yearMatch = game.Date.match(/^(\d{4})/);
+      const itemYear = yearMatch ? yearMatch[1] : '';
+      const matchYear = selectedYear === 'All' || itemYear === selectedYear;
+      if (!matchYear) return false;
+
+      const matchStadium = viewMode === 'homeTeam' ? (selectedStadiumFilter === 'All' || game.Stadium === selectedStadiumFilter) : true;
+      if (!matchStadium) return false;
+
+      return true;
+    });
+
+    filtered = [...filtered].sort((a, b) => {
+      switch (sortMode) {
+        case 'audienceDesc':
+          return b.Audience - a.Audience;
+        case 'tempDesc':
+          return b['MaxTemp(C)'] - a['MaxTemp(C)'];
+        case 'rainAsc':
+          return a['Rainfall(mm)'] - b['Rainfall(mm)'];
+        case 'date':
+        default:
+          return new Date(a.Date).getTime() - new Date(b.Date).getTime();
+      }
+    });
+
+    return filtered;
+  }, [rawData, viewMode, selectedOption, sortMode, selectedYear, selectedStadiumFilter]);
+
+  const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
+  const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        titleColor: '#1f2937',
+        bodyColor: '#4b5563',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        padding: 12,
+        boxPadding: 6,
+        usePointStyle: true,
+        callbacks: {
+          title: function(context: any) {
+            return context[0].label;
+          },
+          label: function(context: any) {
+            const dataIndex = context.dataIndex;
+            const data = chartData[dataIndex];
+            
+            const isMaxTemp = maxTemp !== null && data['MaxTemp(C)'] === maxTemp && maxTemp > 0;
+            const isMaxRain = maxRain !== null && data['Rainfall(mm)'] === maxRain && maxRain > 0;
+            
+            const tempLabel = isMaxTemp ? `最高氣溫：${data['MaxTemp(C)']}°C (🔥 最高)` : `最高氣溫：${data['MaxTemp(C)']}°C`;
+            const rainLabel = isMaxRain ? `降雨量：${data['Rainfall(mm)']} mm (🌧️ 最高)` : `降雨量：${data['Rainfall(mm)']} mm`;
+
+            return [
+              `場次：${data.GameSno}`,
+              `人數：${data.Audience.toLocaleString()}`,
+              `場地：${data.Stadium}`,
+              `對戰：${data.AwayTeam} vs ${data.HomeTeam}`,
+              tempLabel,
+              rainLabel
+            ];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: '#f3f4f6',
+        },
+        ticks: {
+          callback: function(value: any) {
+            return value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value;
+          }
+        }
+      }
+    }
+  };
+
+  const pointBackgroundColors = chartData.map(d => {
+    const isMaxTemp = maxTemp !== null && d['MaxTemp(C)'] === maxTemp && maxTemp > 0;
+    const isMaxRain = maxRain !== null && d['Rainfall(mm)'] === maxRain && maxRain > 0;
+    if (isMaxTemp && isMaxRain) return '#a855f7'; // purple
+    if (isMaxTemp) return '#ef4444'; // red
+    if (isMaxRain) return '#06b6d4'; // cyan
+    return '#1d4ed8'; // default blue
+  });
+
+  const pointRadii = chartData.map(d => {
+    const isMaxTemp = maxTemp !== null && d['MaxTemp(C)'] === maxTemp && maxTemp > 0;
+    const isMaxRain = maxRain !== null && d['Rainfall(mm)'] === maxRain && maxRain > 0;
+    return (isMaxTemp || isMaxRain) ? 8 : 4;
+  });
+
+  const chartJsData = {
+    labels: chartData.map(d => d.Date),
+    datasets: [
+      {
+        label: '觀眾人數',
+        data: chartData.map(d => d.Audience),
+        borderColor: '#1d4ed8',
+        backgroundColor: pointBackgroundColors,
+        tension: 0.1,
+        pointRadius: pointRadii,
+        pointHoverRadius: pointRadii.map(r => r + 2),
+        pointBackgroundColor: pointBackgroundColors,
+        pointBorderColor: pointBackgroundColors,
+        borderWidth: 2,
+      }
+    ]
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      {/* Header */}
+      <header className="bg-blue-700 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="w-6 h-6" />
+          <h1 className="text-xl font-bold">中職票房分析</h1>
+        </div>
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className="p-2 hover:bg-blue-600 rounded-full transition-colors"
+          aria-label="設定"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-white p-4 shadow-md border-b border-gray-200 animate-in slide-in-from-top-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            GAS Web App URL (留空則使用測試資料)
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              value={gasUrl}
+              onChange={(e) => setGasUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/.../exec"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+      )}
+
+      <main className="p-4 max-w-7xl mx-auto space-y-6">
+        {/* Controls */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">分析維度</label>
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value as ViewMode)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="homeTeam">各隊主場人數</option>
+              <option value="stadium">各球場人數</option>
+            </select>
+          </div>
+          
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              {viewMode === 'homeTeam' ? '選擇球隊' : '選擇球場'}
+            </label>
+            <select
+              value={selectedOption}
+              onChange={(e) => setSelectedOption(e.target.value)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              {options.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇年份</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="All">全部年份</option>
+              {availableYears.filter(y => y !== 'All').map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          {viewMode === 'homeTeam' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇球場</label>
+              <select
+                value={selectedStadiumFilter}
+                onChange={(e) => setSelectedStadiumFilter(e.target.value)}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="All">全部球場</option>
+                {availableStadiumsForTeam.filter(s => s !== 'All').map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Sorting */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSortMode('date')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              sortMode === 'date' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            依日期排序
+          </button>
+          <button
+            onClick={() => setSortMode('audienceDesc')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              sortMode === 'audienceDesc' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Users className="w-4 h-4" /> 人數由高到低
+          </button>
+          <button
+            onClick={() => setSortMode('tempDesc')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              sortMode === 'tempDesc' ? 'bg-red-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Thermometer className="w-4 h-4" /> 氣溫由高到低
+          </button>
+          <button
+            onClick={() => setSortMode('rainAsc')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              sortMode === 'rainAsc' ? 'bg-cyan-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <CloudRain className="w-4 h-4" /> 降雨量由低到高
+          </button>
+        </div>
+
+        {/* Chart Area */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col">
+          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            {selectedOption} - 人數趨勢
+            {loading && <span className="text-sm font-normal text-gray-400 animate-pulse">載入中...</span>}
+          </h2>
+          
+          {error ? (
+            <div className="flex-1 flex items-center justify-center text-red-500 whitespace-pre-line text-center">
+              {error}
+            </div>
+          ) : chartData.length === 0 && !loading ? (
+            <div className="flex-1 flex items-center justify-center text-gray-400">
+              沒有符合的資料
+            </div>
+          ) : (
+            <div className="flex flex-col flex-1 w-full">
+              <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-gray-600">
+                <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#1d4ed8] mr-1.5"></span>一般場次</div>
+                <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#ef4444] mr-1.5"></span>最高氣溫</div>
+                <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#06b6d4] mr-1.5"></span>最高降雨量</div>
+                <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#a855f7] mr-1.5"></span>最高溫且最高降雨</div>
+              </div>
+              <div className="w-full overflow-x-auto pb-4">
+                <div className="relative min-h-[400px]" style={{ width: Math.max(800, chartData.length * 30) + 'px' }}>
+                  <Line options={chartOptions} data={chartJsData} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
