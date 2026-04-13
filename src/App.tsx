@@ -46,6 +46,11 @@ export default function App() {
     setSelectedOption(''); // Reset selected option to trigger auto-select
   }, [viewMode]);
 
+  // Reset stadium filter when selected team changes
+  useEffect(() => {
+    setSelectedStadiumFilter('All');
+  }, [selectedOption]);
+
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
