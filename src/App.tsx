@@ -300,8 +300,25 @@ export default function App() {
       )}
 
       <main className="p-4 max-w-7xl mx-auto space-y-6">
-        {/* Controls */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {loading && rawData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-in fade-in duration-500">
+            <div className="relative flex items-center justify-center">
+              {/* 背景圓環 */}
+              <div className="w-20 h-20 border-4 border-blue-100 rounded-full"></div>
+              {/* 旋轉動畫 */}
+              <div className="w-20 h-20 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+              {/* 中心圖示 */}
+              <BarChart2 className="w-8 h-8 text-blue-600 absolute animate-pulse" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-bold text-gray-800">正在讀取最新票房資料...</h3>
+              <p className="text-sm text-gray-500 animate-pulse">這可能需要幾秒鐘的時間，請稍候</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Controls */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">分析維度</label>
             <select
@@ -427,6 +444,8 @@ export default function App() {
             </div>
           )}
         </div>
+          </>
+        )}
       </main>
     </div>
   );
