@@ -8,6 +8,7 @@ export interface GameData {
   "MaxTemp(C)": number;
   "Rainfall(mm)": number;
   Theme?: string;
+  Url?: string;
 }
 
 export const generateMockData = (): Record<string, GameData[]> => {
@@ -40,6 +41,7 @@ export const generateMockData = (): Record<string, GameData[]> => {
         "MaxTemp(C)": Math.floor(Math.random() * 15) + 20,
         "Rainfall(mm)": Math.random() > 0.7 ? Math.floor(Math.random() * 50) : 0,
         Theme: hasTheme ? mockThemes[Math.floor(Math.random() * mockThemes.length)] : "",
+        Url: hasTheme ? "https://www.cpbl.com.tw" : "",
       });
     }
     // Sort by date

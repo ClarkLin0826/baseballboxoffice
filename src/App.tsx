@@ -85,6 +85,7 @@ export default function App() {
             'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
             'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
             Theme: item.Theme || '',
+            Url: item.Url || item.URL || '', // Map URL from column G
           }));
           
           setRawData(processedData);
@@ -195,6 +196,29 @@ export default function App() {
       mode: 'index' as const,
       intersect: false,
     },
+    onClick: (event: any, elements: any[]) => {
+      if (elements.length > 0) {
+        const dataIndex = elements[0].index;
+        const game = chartData[dataIndex];
+        // @ts-ignore - Url property might not be perfectly typed in GameData yet
+        const url = game.Url || game.URL;
+        if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
+      }
+    },
+    onHover: (event: any, elements: any[]) => {
+      const target = event.native ? event.native.target : event.target;
+      if (target && target.style) {
+        if (elements.length > 0) {
+          const game = chartData[elements[0].index];
+          // @ts-ignore
+          target.style.cursor = (game.Url || game.URL) ? 'pointer' : 'default';
+        } else {
+          target.style.cursor = 'default';
+        }
+      }
+    },
     plugins: {
       legend: {
         display: false,
@@ -241,6 +265,12 @@ export default function App() {
 
             if (data.Theme) {
               tooltipLines.splice(2, 0, `主題日：${data.Theme} ⭐`);
+            }
+
+            // @ts-ignore
+            if (data.Url || data.URL) {
+              tooltipLines.push('');
+              tooltipLines.push('👉 點擊圓點查看賽事詳情');
             }
 
             return tooltipLines;
