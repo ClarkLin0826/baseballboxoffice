@@ -12,7 +12,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { generateMockData, GameData } from './mockData';
-import { Settings, BarChart2, CloudRain, Thermometer, Users } from 'lucide-react';
+import { Settings, BarChart2, CloudRain, Thermometer, Users, X, ExternalLink } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -43,6 +43,7 @@ export default function App() {
   const [selectedCheerleader, setSelectedCheerleader] = useState<string>('All');
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
 
   // Reset filters when view mode changes
   useEffect(() => {
@@ -224,20 +225,14 @@ export default function App() {
       if (elements.length > 0) {
         const dataIndex = elements[0].index;
         const game = chartData[dataIndex];
-        // @ts-ignore - Url property might not be perfectly typed in GameData yet
-        const url = game.Url || game.URL;
-        if (url) {
-          window.open(url, '_blank', 'noopener,noreferrer');
-        }
+        setSelectedGame(game);
       }
     },
     onHover: (event: any, elements: any[]) => {
       const target = event.native ? event.native.target : event.target;
       if (target && target.style) {
         if (elements.length > 0) {
-          const game = chartData[elements[0].index];
-          // @ts-ignore
-          target.style.cursor = (game.Url || game.URL) ? 'pointer' : 'default';
+          target.style.cursor = 'pointer';
         } else {
           target.style.cursor = 'default';
         }
@@ -295,11 +290,8 @@ export default function App() {
               tooltipLines.push(`啦啦隊：${data.Cheerleaders}`);
             }
 
-            // @ts-ignore
-            if (data.Url || data.URL) {
-              tooltipLines.push('');
-              tooltipLines.push('👉 點擊圓點查看賽事詳情');
-            }
+            tooltipLines.push('');
+            tooltipLines.push('👉 點擊圓點查看詳細資訊');
 
             return tooltipLines;
           }
@@ -620,6 +612,89 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Game Details Modal */}
+      {selectedGame && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedGame(null)}>
+          <div 
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-blue-700 p-4 flex justify-between items-center text-white">
+              <h3 className="font-bold text-lg">賽事詳細資訊</h3>
+              <button 
+                onClick={() => setSelectedGame(null)}
+                className="p-1 hover:bg-blue-600 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
+                <div className="col-span-2 flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">日期</span>
+                  <span className="font-medium text-gray-900">{selectedGame.Date}</span>
+                </div>
+                <div className="col-span-2 flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">對戰組合</span>
+                  <span className="font-medium text-gray-900">{selectedGame.AwayTeam} vs {selectedGame.HomeTeam}</span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">場地</span>
+                  <span className="font-medium text-gray-900">{selectedGame.Stadium}</span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">觀眾人數</span>
+                  <span className="font-medium text-blue-600">{selectedGame.Audience.toLocaleString()} 人</span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">最高氣溫</span>
+                  <span className="font-medium text-red-500">{selectedGame['MaxTemp(C)']}°C</span>
+                </div>
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-gray-500">降雨量</span>
+                  <span className="font-medium text-cyan-600">{selectedGame['Rainfall(mm)']} mm</span>
+                </div>
+                
+                {selectedGame.Theme && (
+                  <div className="col-span-2 flex items-center justify-between border-b pb-2">
+                    <span className="text-gray-500">主題日</span>
+                    <span className="font-medium text-amber-500 flex items-center gap-1">
+                      {selectedGame.Theme} ⭐
+                    </span>
+                  </div>
+                )}
+                
+                {selectedGame.Cheerleaders && (
+                  <div className="col-span-2 flex flex-col gap-1 border-b pb-2">
+                    <span className="text-gray-500">啦啦隊班表</span>
+                    <span className="font-medium text-gray-900 leading-relaxed">
+                      {selectedGame.Cheerleaders}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* @ts-ignore */}
+              {(selectedGame.Url || selectedGame.URL) && (
+                <div className="pt-4">
+                  <a 
+                    // @ts-ignore
+                    href={selectedGame.Url || selectedGame.URL} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center w-full gap-2 py-3 px-4 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    本場賽事 CPBL 官網詳細資訊
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

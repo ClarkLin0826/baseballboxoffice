@@ -6,7 +6,7 @@
     <title>中職票房分析</title>
     
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/cpbl-dashboard/manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#1d4ed8" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -19,7 +19,7 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/cpbl-dashboard/sw.js').then(registration => {
+          navigator.serviceWorker.register('./sw.js').then(registration => {
             console.log('SW registered: ', registration);
           }).catch(registrationError => {
             console.log('SW registration failed: ', registrationError);
