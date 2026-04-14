@@ -36,6 +36,7 @@ export default function App() {
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('All');
   const [selectedStadiumFilter, setSelectedStadiumFilter] = useState<string>('All');
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('All');
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -43,6 +44,7 @@ export default function App() {
   useEffect(() => {
     setSelectedYear('All');
     setSelectedStadiumFilter('All');
+    setSelectedDayOfWeek('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
   }, [viewMode]);
 
@@ -147,6 +149,12 @@ export default function App() {
       const matchStadium = viewMode === 'homeTeam' ? (selectedStadiumFilter === 'All' || game.Stadium === selectedStadiumFilter) : true;
       if (!matchStadium) return false;
 
+      const dayOfWeekMap = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      const dateObj = new Date(game.Date);
+      const dayStr = dayOfWeekMap[dateObj.getDay()];
+      const matchDay = selectedDayOfWeek === 'All' || dayStr === selectedDayOfWeek;
+      if (!matchDay) return false;
+
       return true;
     });
 
@@ -165,7 +173,7 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, selectedYear, selectedStadiumFilter]);
+  }, [rawData, viewMode, selectedOption, sortMode, selectedYear, selectedStadiumFilter, selectedDayOfWeek]);
 
   const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
   const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
@@ -200,7 +208,12 @@ export default function App() {
             const tempLabel = isMaxTemp ? `最高氣溫：${data['MaxTemp(C)']}°C (🔥 最高)` : `最高氣溫：${data['MaxTemp(C)']}°C`;
             const rainLabel = isMaxRain ? `降雨量：${data['Rainfall(mm)']} mm (🌧️ 最高)` : `降雨量：${data['Rainfall(mm)']} mm`;
 
+            const dayOfWeekMap = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const dateObj = new Date(data.Date);
+            const dayStr = dayOfWeekMap[dateObj.getDay()];
+
             return [
+              `日期：${data.Date} (${dayStr})`,
               `場次：${data.GameSno}`,
               `人數：${data.Audience.toLocaleString()}`,
               `場地：${data.Stadium}`,
@@ -323,7 +336,7 @@ export default function App() {
         ) : (
           <>
             {/* Controls */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">分析維度</label>
             <select
@@ -380,6 +393,24 @@ export default function App() {
               </select>
             </div>
           )}
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇星期</label>
+            <select
+              value={selectedDayOfWeek}
+              onChange={(e) => setSelectedDayOfWeek(e.target.value)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="All">全部星期</option>
+              <option value="星期一">星期一</option>
+              <option value="星期二">星期二</option>
+              <option value="星期三">星期三</option>
+              <option value="星期四">星期四</option>
+              <option value="星期五">星期五</option>
+              <option value="星期六">星期六</option>
+              <option value="星期日">星期日</option>
+            </select>
+          </div>
         </div>
 
         {/* Sorting */}
