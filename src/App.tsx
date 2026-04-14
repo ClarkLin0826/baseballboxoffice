@@ -216,8 +216,9 @@ export default function App() {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
-      mode: 'index' as const,
-      intersect: false,
+      mode: 'nearest' as const,
+      intersect: true,
+      axis: 'xy' as const,
     },
     onClick: (event: any, elements: any[]) => {
       if (elements.length > 0) {
