@@ -40,6 +40,7 @@ export default function App() {
   const [selectedStadiumFilter, setSelectedStadiumFilter] = useState<string>('All');
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('All');
   const [selectedThemeFilter, setSelectedThemeFilter] = useState<string>('All');
+  const [selectedCheerleader, setSelectedCheerleader] = useState<string>('All');
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -49,12 +50,14 @@ export default function App() {
     setSelectedStadiumFilter('All');
     setSelectedDayOfWeek('All');
     setSelectedThemeFilter('All');
+    setSelectedCheerleader('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
   }, [viewMode]);
 
   // Reset stadium filter when selected team changes
   useEffect(() => {
     setSelectedStadiumFilter('All');
+    setSelectedCheerleader('All');
   }, [selectedOption]);
 
   // Fetch data
@@ -86,6 +89,7 @@ export default function App() {
             'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
             Theme: item.Theme || '',
             Url: item.Url || item.URL || '', // Map URL from column G
+            Cheerleaders: item.Cheerleaders || '',
           }));
           
           setRawData(processedData);
@@ -141,6 +145,21 @@ export default function App() {
     return ['All', ...Array.from(stadiums).sort()];
   }, [rawData, viewMode, selectedOption]);
 
+  // Extract available cheerleaders for the selected team
+  const availableCheerleaders = useMemo(() => {
+    if (viewMode !== 'homeTeam' || !selectedOption) return ['All'];
+    const cheerleadersSet = new Set<string>();
+    rawData.filter(d => d.HomeTeam === selectedOption).forEach(game => {
+      if (game.Cheerleaders) {
+        game.Cheerleaders.split(/[,、]/).forEach(c => {
+          const name = c.trim();
+          if (name) cheerleadersSet.add(name);
+        });
+      }
+    });
+    return ['All', ...Array.from(cheerleadersSet).sort()];
+  }, [rawData, viewMode, selectedOption]);
+
   // Filter and sort data
   const chartData = useMemo(() => {
     let filtered = rawData.filter(game => {
@@ -166,6 +185,10 @@ export default function App() {
                          !game.Theme;
       if (!matchTheme) return false;
 
+      const matchCheerleader = selectedCheerleader === 'All' || 
+                               (game.Cheerleaders && game.Cheerleaders.split(/[,、]/).map(c => c.trim()).includes(selectedCheerleader));
+      if (!matchCheerleader) return false;
+
       return true;
     });
 
@@ -184,7 +207,7 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, selectedYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter]);
+  }, [rawData, viewMode, selectedOption, sortMode, selectedYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader]);
 
   const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
   const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
@@ -265,6 +288,10 @@ export default function App() {
 
             if (data.Theme) {
               tooltipLines.splice(2, 0, `主題日：${data.Theme} ⭐`);
+            }
+
+            if (data.Cheerleaders) {
+              tooltipLines.push(`啦啦隊：${data.Cheerleaders}`);
             }
 
             // @ts-ignore
@@ -415,7 +442,7 @@ export default function App() {
         ) : (
           <>
             {/* Controls */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">分析維度</label>
             <select
@@ -503,6 +530,22 @@ export default function App() {
               <option value="NormalOnly">僅看一般例行賽</option>
             </select>
           </div>
+
+          {viewMode === 'homeTeam' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇啦啦隊</label>
+              <select
+                value={selectedCheerleader}
+                onChange={(e) => setSelectedCheerleader(e.target.value)}
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="All">全部人員</option>
+                {availableCheerleaders.filter(c => c !== 'All').map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Sorting */}
