@@ -76,7 +76,9 @@ export default function App() {
           const uniqueData = Array.from(new Map(flatData.map(item => [`${item.Date}-${item.GameSno}`, item])).values());
           setRawData(uniqueData);
         } else {
-          const response = await fetch(gasUrl);
+          const response = await fetch(`${gasUrl}${gasUrl.includes('?') ? '&' : '?'}t=${new Date().getTime()}`, {
+            cache: 'no-store'
+          });
           if (!response.ok) throw new Error('Network response was not ok');
           const data = await response.json();
           
@@ -104,7 +106,7 @@ export default function App() {
               const ig = normalizedRow['ig'] || normalizedRow['連結'] || normalizedRow['url'] || normalizedRow['ig連結'];
               
               if (name && ig) {
-                newIgMapping[name.toString().trim()] = ig.toString().trim();
+                newIgMapping[name.toString().trim().toLowerCase()] = ig.toString().trim();
               }
             });
             delete data[igSheetKey]; // Remove so it doesn't break game data parsing
@@ -725,7 +727,7 @@ export default function App() {
                     <span className="text-gray-500">啦啦隊班表</span>
                     <div className="flex flex-wrap gap-2">
                       {selectedGame.Cheerleaders.split(/[,、，]/).map(c => c.trim()).filter(Boolean).map((name, idx) => {
-                        const igUrl = igMapping[name];
+                        const igUrl = igMapping[name.toLowerCase()];
                         if (igUrl) {
                           return (
                             <a 
