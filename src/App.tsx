@@ -44,6 +44,7 @@ export default function App() {
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [showSettings, setShowSettings] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
+  const [igMapping, setIgMapping] = useState<Record<string, string>>({});
 
   // Reset filters when view mode changes
   useEffect(() => {
@@ -78,6 +79,26 @@ export default function App() {
           const response = await fetch(gasUrl);
           if (!response.ok) throw new Error('Network response was not ok');
           const data = await response.json();
+          
+          // Extract IG mapping if the sheet exists
+          const newIgMapping: Record<string, string> = {};
+          const igSheetKey = Object.keys(data).find(k => k.toLowerCase() === 'cheerleadersig' || k === '啦啦隊ig');
+          if (igSheetKey) {
+            // GAS might return an array of objects or an object of objects depending on how it's parsed
+            const igData = Array.isArray(data[igSheetKey]) ? data[igSheetKey] : Object.values(data[igSheetKey]);
+            igData.forEach((row: any) => {
+              if (!row) return;
+              // Check various possible column names for Name and IG
+              const name = row['名字'] || row['Name'] || row['姓名'] || row['啦啦隊'] || row['name'];
+              const ig = row['IG'] || row['連結'] || row['URL'] || row['IG連結'] || row['ig'];
+              if (name && ig) {
+                newIgMapping[name.toString().trim()] = ig.toString().trim();
+              }
+            });
+            delete data[igSheetKey]; // Remove so it doesn't break game data parsing
+          }
+          setIgMapping(newIgMapping);
+
           const flatData = Object.values(data).flat() as GameData[];
           // Use Date + GameSno to prevent 2024 and 2025 games from overwriting each other
           const uniqueData = Array.from(new Map(flatData.map(item => [`${item.Date}-${item.GameSno}`, item])).values());
@@ -88,6 +109,7 @@ export default function App() {
             Audience: Number(item.Audience) || 0,
             'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
             'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
+            'RainProb(%)': item['RainProb(%)'] !== undefined && item['RainProb(%)'] !== '' ? Number(item['RainProb(%)']) : undefined,
             Theme: item.Theme || '',
             Url: item.Url || item.URL || '', // Map URL from column G
             Cheerleaders: item.Cheerleaders || '',
@@ -133,7 +155,8 @@ export default function App() {
   // Extract available years
   const availableYears = useMemo(() => {
     const years = new Set(rawData.map(d => {
-      const match = d.Date.match(/^(\d{4})/);
+      if (!d.Date) return '';
+      const match = String(d.Date).match(/^(\d{4})/);
       return match ? match[1] : '';
     }).filter(Boolean));
     return ['All', ...Array.from(years).sort((a, b) => b.localeCompare(a))];
@@ -164,10 +187,18 @@ export default function App() {
   // Filter and sort data
   const chartData = useMemo(() => {
     let filtered = rawData.filter(game => {
+      if (!game.Date) return false;
+      
+      // Filter out future games that don't have RainProb(%) and don't have Audience
+      // This ensures we only show past games (with Audience) or future games with weather forecast
+      if (!game.Audience && game['RainProb(%)'] === undefined) {
+        return false;
+      }
+      
       const matchView = viewMode === 'homeTeam' ? game.HomeTeam === selectedOption : game.Stadium === selectedOption;
       if (!matchView) return false;
 
-      const yearMatch = game.Date.match(/^(\d{4})/);
+      const yearMatch = String(game.Date).match(/^(\d{4})/);
       const itemYear = yearMatch ? yearMatch[1] : '';
       const matchYear = selectedYear === 'All' || itemYear === selectedYear;
       if (!matchYear) return false;
@@ -275,12 +306,16 @@ export default function App() {
             const tooltipLines = [
               `日期：${data.Date} (${dayStr})`,
               `場次：${data.GameSno}`,
-              `人數：${data.Audience.toLocaleString()}`,
+              data.Audience ? `人數：${data.Audience.toLocaleString()}` : `人數：尚未開打`,
               `場地：${data.Stadium}`,
               `對戰：${data.AwayTeam} vs ${data.HomeTeam}`,
               tempLabel,
               rainLabel
             ];
+
+            if (data['RainProb(%)'] !== undefined) {
+              tooltipLines.push(`降雨機率：${data['RainProb(%)']}%`);
+            }
 
             if (data.Theme) {
               tooltipLines.splice(2, 0, `主題日：${data.Theme} ⭐`);
@@ -657,6 +692,13 @@ export default function App() {
                   <span className="font-medium text-cyan-600">{selectedGame['Rainfall(mm)']} mm</span>
                 </div>
                 
+                {selectedGame['RainProb(%)'] !== undefined && (
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <span className="text-gray-500">降雨機率</span>
+                    <span className="font-medium text-blue-500">{selectedGame['RainProb(%)']}%</span>
+                  </div>
+                )}
+                
                 {selectedGame.Theme && (
                   <div className="col-span-2 flex items-center justify-between border-b pb-2">
                     <span className="text-gray-500">主題日</span>
@@ -667,11 +709,31 @@ export default function App() {
                 )}
                 
                 {selectedGame.Cheerleaders && (
-                  <div className="col-span-2 flex flex-col gap-1 border-b pb-2">
+                  <div className="col-span-2 flex flex-col gap-2 border-b pb-3">
                     <span className="text-gray-500">啦啦隊班表</span>
-                    <span className="font-medium text-gray-900 leading-relaxed">
-                      {selectedGame.Cheerleaders}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedGame.Cheerleaders.split(/[,、]/).map(c => c.trim()).filter(Boolean).map((name, idx) => {
+                        const igUrl = igMapping[name];
+                        if (igUrl) {
+                          return (
+                            <a 
+                              key={idx} 
+                              href={igUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-pink-50 text-pink-600 hover:bg-pink-100 rounded-full text-sm font-medium transition-colors"
+                            >
+                              {name}
+                            </a>
+                          );
+                        }
+                        return (
+                          <span key={idx} className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+                            {name}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

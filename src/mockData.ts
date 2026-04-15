@@ -7,8 +7,10 @@ export interface GameData {
   Audience: number;
   "MaxTemp(C)": number;
   "Rainfall(mm)": number;
+  "RainProb(%)"?: number;
   Theme?: string;
   Url?: string;
+  Cheerleaders?: string;
 }
 
 export const generateMockData = (): Record<string, GameData[]> => {
