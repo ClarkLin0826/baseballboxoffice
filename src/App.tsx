@@ -113,15 +113,46 @@ export default function App() {
           }
           setIgMapping(newIgMapping);
 
-          const flatData = Object.values(data).flat() as GameData[];
+          const flatData: GameData[] = [];
+          
+          // Process year sheets first (e.g., 2024, 2025, 2026) so they take precedence
+          const yearKeys = Object.keys(data).filter(k => /^\d{4}$/.test(k));
+          const otherKeys = Object.keys(data).filter(k => !/^\d{4}$/.test(k));
+          
+          // Add year data first
+          yearKeys.forEach(key => {
+            if (Array.isArray(data[key])) {
+              flatData.push(...data[key]);
+            }
+          });
+          
+          // Then add other data (team sheets)
+          otherKeys.forEach(key => {
+            if (Array.isArray(data[key])) {
+              flatData.push(...data[key]);
+            }
+          });
+
           // Use Date + GameSno + HomeTeam to prevent games from overwriting each other
-          // Sometimes GameSno resets or overlaps across different sheets/years
-          const uniqueData = Array.from(new Map(flatData.map(item => {
-            // Create a truly unique key for each game
-            const year = item.Date ? item.Date.split('/')[0] : '';
-            const key = `${year}-${item.GameSno}-${item.HomeTeam}`;
-            return [key, item];
-          })).values());
+          // Because we added year sheets first, if a team sheet has the same game, 
+          // Map will overwrite it, which is the OPPOSITE of what we want if year sheets are more up-to-date.
+          // So we should reverse the array before creating the Map, or use a custom merge logic.
+          
+          const uniqueGamesMap = new Map<string, GameData>();
+          
+          // Process in order: team sheets first, then year sheets. 
+          // This way, year sheets (which are processed later in this loop) will overwrite team sheets.
+          [...otherKeys, ...yearKeys].forEach(key => {
+            if (Array.isArray(data[key])) {
+              data[key].forEach((item: GameData) => {
+                const year = item.Date ? item.Date.split('/')[0] : '';
+                const uniqueKey = `${year}-${item.GameSno}-${item.HomeTeam}`;
+                uniqueGamesMap.set(uniqueKey, item);
+              });
+            }
+          });
+          
+          const uniqueData = Array.from(uniqueGamesMap.values());
           
           // Ensure numeric values
           const processedData = uniqueData.map(item => ({
