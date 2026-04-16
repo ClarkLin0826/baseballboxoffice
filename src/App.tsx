@@ -839,7 +839,7 @@ export default function App() {
                 </div>
 
                 {/* 平均年度勝率 */}
-                {allYearsHaveWinRate && (
+                {viewMode === 'homeTeam' && allYearsHaveWinRate && (
                   <div className="flex-1 md:flex-none bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
                     <span className="text-indigo-700/80 text-xs font-bold mb-0.5 tracking-wider">平均年度勝率</span>
                     <div className="flex items-baseline gap-1">
