@@ -147,8 +147,13 @@ export default function App() {
           [...otherKeys, ...yearKeys].forEach(key => {
             if (Array.isArray(data[key])) {
               data[key].forEach((item: GameData) => {
-                const year = item.Date ? item.Date.split('/')[0] : '';
-                const uniqueKey = `${year}-${item.GameSno}-${item.HomeTeam}`;
+                if (!item.Date || !item.GameSno) return;
+                const year = item.Date.split('/')[0];
+                // Use only Year and normalized GameSno to uniquely identify a game.
+                // We MUST skip HomeTeam here, otherwise fixing a typo in HomeTeam 
+                // in one sheet won't overwrite the old typo in another sheet!
+                const normSno = isNaN(Number(item.GameSno)) ? item.GameSno : Number(item.GameSno);
+                const uniqueKey = `${year}-${normSno}`;
                 uniqueGamesMap.set(uniqueKey, item);
               });
             }
