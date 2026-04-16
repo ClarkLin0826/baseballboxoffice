@@ -685,10 +685,44 @@ export default function App() {
 
         {/* Chart Area */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            {selectedOption} - 人數趨勢
-            {loading && <span className="text-sm font-normal text-gray-400 animate-pulse">載入中...</span>}
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              {selectedOption} - 人數趨勢
+              {loading && <span className="text-sm font-normal text-gray-400 animate-pulse">載入中...</span>}
+            </h2>
+            
+            {!loading && chartData.length > 0 && (
+              <div className="flex flex-wrap lg:flex-nowrap gap-3 items-center w-full md:w-auto">
+                {/* 總場次 */}
+                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                  <span className="text-slate-500 text-xs font-bold mb-0.5 tracking-wider">總場次</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-slate-800 text-xl font-black">{chartData.length}</span>
+                    <span className="text-slate-500 text-xs font-medium">場</span>
+                  </div>
+                </div>
+                
+                {/* 總人數 */}
+                <div className="flex-1 md:flex-none bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                  <span className="text-emerald-700/80 text-xs font-bold mb-0.5 tracking-wider">總人數</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-emerald-700 text-xl font-black">{chartData.reduce((sum, d) => sum + d.Audience, 0).toLocaleString()}</span>
+                    <span className="text-emerald-700/80 text-xs font-medium">人</span>
+                  </div>
+                </div>
+                
+                {/* 場均人數 (Highlighted) */}
+                <div className="flex-1 md:flex-none bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-2 flex flex-col items-start shadow-md relative overflow-hidden transition-transform hover:-translate-y-0.5">
+                  <div className="absolute left-0 top-0 w-1.5 h-full bg-amber-400"></div>
+                  <span className="text-amber-800/70 text-xs font-bold mb-0.5 tracking-wider">場均人數</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-amber-600 text-3xl font-black drop-shadow-sm">{Math.round(chartData.reduce((sum, d) => sum + d.Audience, 0) / chartData.length).toLocaleString()}</span>
+                    <span className="text-amber-800/70 text-sm font-medium">人</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           
           {error ? (
             <div className="flex-1 flex items-center justify-center text-red-500 whitespace-pre-line text-center">
