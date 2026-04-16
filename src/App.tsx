@@ -689,18 +689,18 @@ export default function App() {
               <select
                 value={startYear}
                 onChange={(e) => setStartYear(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="flex-1 min-w-0 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
               >
                 <option value="All">最早</option>
                 {availableYears.filter(y => y !== 'All').sort().map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-              <span className="text-gray-400 font-medium">~</span>
+              <span className="text-gray-400 font-medium shrink-0">~</span>
               <select
                 value={endYear}
                 onChange={(e) => setEndYear(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="flex-1 min-w-0 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
               >
                 <option value="All">最新</option>
                 {availableYears.filter(y => y !== 'All').sort((a, b) => b.localeCompare(a)).map(y => (
@@ -840,9 +840,9 @@ export default function App() {
             </h2>
             
             {!loading && chartData.length > 0 && (
-              <div className="flex flex-wrap lg:flex-nowrap gap-3 items-center w-full md:w-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:flex lg:flex-nowrap gap-3 items-stretch w-full md:w-auto mt-2 md:mt-0">
                 {/* 總場次 */}
-                <div className="flex-1 md:flex-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                <div className="col-span-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
                   <span className="text-slate-500 text-xs font-bold mb-0.5 tracking-wider">總場次</span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-slate-800 text-xl font-black">{chartData.length}</span>
@@ -851,7 +851,7 @@ export default function App() {
                 </div>
                 
                 {/* 總人數 */}
-                <div className="flex-1 md:flex-none bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                <div className="col-span-1 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
                   <span className="text-emerald-700/80 text-xs font-bold mb-0.5 tracking-wider">總人數</span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-emerald-700 text-xl font-black">{chartData.reduce((sum, d) => sum + d.Audience, 0).toLocaleString()}</span>
@@ -860,7 +860,7 @@ export default function App() {
                 </div>
                 
                 {/* 場均人數 (Highlighted) */}
-                <div className="flex-1 md:flex-none bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-2 flex flex-col items-start shadow-md relative overflow-hidden transition-transform hover:-translate-y-0.5">
+                <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-2 flex flex-col items-start shadow-md relative overflow-hidden transition-transform hover:-translate-y-0.5">
                   <div className="absolute left-0 top-0 w-1.5 h-full bg-amber-400"></div>
                   <span className="text-amber-800/70 text-xs font-bold mb-0.5 tracking-wider">場均人數</span>
                   <div className="flex items-baseline gap-1">
@@ -871,7 +871,7 @@ export default function App() {
 
                 {/* 平均年度勝率 */}
                 {viewMode === 'homeTeam' && allYearsHaveWinRate && (
-                  <div className="flex-1 md:flex-none bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                  <div className="col-span-2 md:col-span-1 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
                     <span className="text-indigo-700/80 text-xs font-bold mb-0.5 tracking-wider">平均年度勝率</span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-indigo-700 text-xl font-black">
