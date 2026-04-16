@@ -11,6 +11,8 @@ export interface GameData {
   Theme?: string;
   Url?: string;
   Cheerleaders?: string;
+  WinRate?: number;
+  Rank?: number;
 }
 
 export const generateMockData = (): Record<string, GameData[]> => {

@@ -42,6 +42,7 @@ export default function App() {
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>('All');
   const [selectedThemeFilter, setSelectedThemeFilter] = useState<string>('All');
   const [selectedCheerleader, setSelectedCheerleader] = useState<string>('All');
+  const [selectedWinRateFilter, setSelectedWinRateFilter] = useState<string>('All');
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [showSettings, setShowSettings] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
@@ -55,6 +56,7 @@ export default function App() {
     setSelectedDayOfWeek('All');
     setSelectedThemeFilter('All');
     setSelectedCheerleader('All');
+    setSelectedWinRateFilter('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
   }, [viewMode]);
 
@@ -119,7 +121,9 @@ export default function App() {
           
           // Process year sheets first (e.g., 2024, 2025, 2026) so they take precedence
           const yearKeys = Object.keys(data).filter(k => /^\d{4}$/.test(k));
-          const otherKeys = Object.keys(data).filter(k => !/^\d{4}$/.test(k));
+          const winRateSheetNames = ['年度勝率', '球隊戰績', '勝率', '戰績'];
+          const winRatesSheet = winRateSheetNames.map(name => data[name]).find(sheet => Array.isArray(sheet)) || [];
+          const otherKeys = Object.keys(data).filter(k => !/^\d{4}$/.test(k) && !winRateSheetNames.includes(k));
           
           // Add year data first
           yearKeys.forEach(key => {
@@ -162,16 +166,43 @@ export default function App() {
           const uniqueData = Array.from(uniqueGamesMap.values());
           
           // Ensure numeric values
-          const processedData = uniqueData.map(item => ({
-            ...item,
-            Audience: Number(item.Audience) || 0,
-            'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
-            'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
-            'RainProb(%)': item['RainProb(%)'] !== undefined && item['RainProb(%)'] !== '' ? Number(item['RainProb(%)']) : undefined,
-            Theme: item.Theme || item['主題日'] || '',
-            Url: item.Url || item.URL || item['連結'] || '', // Map URL from column G
-            Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
-          }));
+          const processedData = uniqueData.map(item => {
+            const year = item.Date ? item.Date.split('/')[0] : '';
+            const homeTeam = item.HomeTeam || '';
+            
+            let winRateInfo;
+            if (winRatesSheet.length > 0) {
+              winRateInfo = winRatesSheet.find((w: any) => {
+                const wYear = String(w['年份'] || '');
+                const wTeam = String(w['球隊'] || '');
+                if (wYear !== year) return false;
+                if (homeTeam === wTeam) return true;
+                
+                const cleanH = homeTeam.replace(/[ \-]/g, '');
+                const cleanW = wTeam.replace(/[ \-]/g, '');
+                return cleanH.includes(cleanW) || cleanW.includes(cleanH) ||
+                       (cleanH.includes('統一') && cleanW.includes('統一')) ||
+                       (cleanH.includes('味全') && cleanW.includes('味全')) ||
+                       (cleanH.includes('兄弟') && cleanW.includes('兄弟')) ||
+                       (cleanH.includes('樂天') && cleanW.includes('樂天')) ||
+                       (cleanH.includes('富邦') && cleanW.includes('富邦')) ||
+                       (cleanH.includes('台鋼') && cleanW.includes('台鋼'));
+              });
+            }
+
+            return {
+              ...item,
+              Audience: Number(item.Audience) || 0,
+              'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
+              'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
+              'RainProb(%)': item['RainProb(%)'] !== undefined && item['RainProb(%)'] !== '' ? Number(item['RainProb(%)']) : undefined,
+              Theme: item.Theme || item['主題日'] || '',
+              Url: item.Url || item.URL || item['連結'] || '', // Map URL from column G
+              Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
+              WinRate: winRateInfo && winRateInfo['勝率'] ? Number(winRateInfo['勝率']) : undefined,
+              Rank: winRateInfo && winRateInfo['排名'] ? Number(winRateInfo['排名']) : undefined,
+            };
+          });
           
           setRawData(processedData);
         }
@@ -282,6 +313,11 @@ export default function App() {
                                (game.Cheerleaders && game.Cheerleaders.split(/[,、]/).map(c => c.trim()).includes(selectedCheerleader));
       if (!matchCheerleader) return false;
 
+      const matchWinRate = selectedWinRateFilter === 'All' ? true :
+                           selectedWinRateFilter === '>0.5' ? (game.WinRate !== undefined && game.WinRate >= 0.5) :
+                           selectedWinRateFilter === '<0.5' ? (game.WinRate !== undefined && game.WinRate < 0.5) : true;
+      if (!matchWinRate) return false;
+
       return true;
     });
 
@@ -307,7 +343,7 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader]);
+  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedWinRateFilter]);
 
   const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
   const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
@@ -652,6 +688,19 @@ export default function App() {
             </select>
           </div>
 
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">年度勝率篩選</label>
+            <select
+              value={selectedWinRateFilter}
+              onChange={(e) => setSelectedWinRateFilter(e.target.value)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="All">全部戰績</option>
+              <option value=">0.5">勝率 &gt; 0.500 (A段班)</option>
+              <option value="<0.5">勝率 &lt; 0.500 (B段班)</option>
+            </select>
+          </div>
+
           {viewMode === 'homeTeam' && (
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇啦啦隊</label>
@@ -742,6 +791,18 @@ export default function App() {
                     <span className="text-amber-800/70 text-sm font-medium">人</span>
                   </div>
                 </div>
+
+                {/* 平均年度勝率 (If available) */}
+                {(chartData.filter(d => d.WinRate !== undefined).length > 0) && (
+                  <div className="flex-1 md:flex-none bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                    <span className="text-indigo-700/80 text-xs font-bold mb-0.5 tracking-wider">平均年度勝率</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-indigo-700 text-xl font-black">
+                        {(chartData.filter(d => d.WinRate !== undefined).reduce((sum, d) => sum + d.WinRate!, 0) / chartData.filter(d => d.WinRate !== undefined).length).toFixed(3)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
