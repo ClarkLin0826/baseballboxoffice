@@ -458,7 +458,17 @@ export default function App() {
   });
 
   const chartJsData = {
-    labels: chartData.map(d => d.Date),
+    labels: chartData.map((d, i, arr) => {
+      const sameDateGames = arr.filter(game => game.Date === d.Date);
+      if (sameDateGames.length > 1) {
+        const index = sameDateGames.findIndex(game => game === d);
+        if (sameDateGames.length === 2) {
+          return d.Date + (index === 0 ? ' (午)' : ' (晚)');
+        }
+        return d.Date + ` (第${index + 1}場)`;
+      }
+      return d.Date;
+    }),
     datasets: [
       {
         label: '觀眾人數',
@@ -472,8 +482,7 @@ export default function App() {
           return gradient;
         },
         fill: true,
-        tension: 0.3,
-        cubicInterpolationMode: 'monotone',
+        tension: 0.4,
         pointStyle: 'circle',
         pointRadius: pointRadii,
         pointHoverRadius: pointRadii.map(r => r + 2),
