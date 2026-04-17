@@ -366,15 +366,61 @@ export default function App() {
   // Extract available stadiums for the selected team
   const availableStadiumsForTeam = useMemo(() => {
     if (viewMode !== 'homeTeam' || !selectedOption) return ['All'];
-    const stadiums = new Set(rawData.filter(d => d.HomeTeam === selectedOption).map(d => d.Stadium));
+    const stadiums = new Set<string>();
+    
+    rawData.forEach(game => {
+      if (game.HomeTeam !== selectedOption) return;
+      if (!game.Date) return;
+      
+      const gameDate = new Date(game.Date);
+      if (showNextWeek) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        nextWeek.setHours(23, 59, 59, 999);
+        if (gameDate < today || gameDate > nextWeek) return;
+      } else {
+        if (!game.Audience && game['RainProb(%)'] === undefined) return;
+        const yearMatch = String(game.Date).match(/^(\d{4})/);
+        const itemYear = yearMatch ? yearMatch[1] : '';
+        if (startYear !== 'All' && itemYear < startYear) return;
+        if (endYear !== 'All' && itemYear > endYear) return;
+        if (game.Audience === 0) return;
+      }
+      
+      if (game.Stadium) stadiums.add(game.Stadium);
+    });
+    
     return ['All', ...Array.from(stadiums).sort()];
-  }, [rawData, viewMode, selectedOption]);
+  }, [rawData, viewMode, selectedOption, startYear, endYear, showNextWeek]);
 
   // Extract available cheerleaders for the selected team
   const availableCheerleaders = useMemo(() => {
     if (viewMode !== 'homeTeam' || !selectedOption) return ['All'];
     const cheerleadersSet = new Set<string>();
-    rawData.filter(d => d.HomeTeam === selectedOption).forEach(game => {
+    
+    rawData.forEach(game => {
+      if (game.HomeTeam !== selectedOption) return;
+      if (!game.Date) return;
+      
+      const gameDate = new Date(game.Date);
+      if (showNextWeek) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        nextWeek.setHours(23, 59, 59, 999);
+        if (gameDate < today || gameDate > nextWeek) return;
+      } else {
+        if (!game.Audience && game['RainProb(%)'] === undefined) return;
+        const yearMatch = String(game.Date).match(/^(\d{4})/);
+        const itemYear = yearMatch ? yearMatch[1] : '';
+        if (startYear !== 'All' && itemYear < startYear) return;
+        if (endYear !== 'All' && itemYear > endYear) return;
+        if (game.Audience === 0) return;
+      }
+      
+      if (selectedStadiumFilter !== 'All' && game.Stadium !== selectedStadiumFilter) return;
+
       if (game.Cheerleaders) {
         game.Cheerleaders.split(/[,、]/).forEach(c => {
           const name = c.trim();
@@ -382,8 +428,9 @@ export default function App() {
         });
       }
     });
+
     return ['All', ...Array.from(cheerleadersSet).sort()];
-  }, [rawData, viewMode, selectedOption]);
+  }, [rawData, viewMode, selectedOption, startYear, endYear, showNextWeek, selectedStadiumFilter]);
 
   // Filter and sort data
   const chartData = useMemo(() => {
