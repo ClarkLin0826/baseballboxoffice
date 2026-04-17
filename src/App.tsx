@@ -199,7 +199,7 @@ export default function App() {
         const years = Array.from(new Set(processedData.map(d => d.Date ? d.Date.split('/')[0] : '').filter(Boolean))).sort();
         if (years.length > 0) {
           const latestYear = years[years.length - 1];
-          const startIdx = Math.max(0, years.length - 5);
+          const startIdx = Math.max(0, years.length - 2);
           setStartYear(years[startIdx]);
           setEndYear(latestYear);
         }
