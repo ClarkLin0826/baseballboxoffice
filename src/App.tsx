@@ -48,6 +48,22 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState<GameData | null>(null);
   const [igMapping, setIgMapping] = useState<Record<string, string>>({});
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Default to system preference if we don't have a saved one
+  useEffect(() => {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setDarkMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // Reset filters when view mode changes
   useEffect(() => {
@@ -68,205 +84,220 @@ export default function App() {
 
   // Fetch data
   useEffect(() => {
+    let isMounted = true;
+
+    const processData = (data: any, isInitial: boolean) => {
+      if (!isMounted) return;
+      // Extract IG mapping if the sheet exists
+      const newIgMapping: Record<string, string> = {};
+      const igSheetKey = Object.keys(data).find(k => {
+        const normalized = k.replace(/\s/g, '').toLowerCase();
+        return normalized.includes('啦啦隊ig') || normalized.includes('cheerleadersig') || normalized === 'ig';
+      });
+      
+      if (igSheetKey) {
+        const igData = Array.isArray(data[igSheetKey]) ? data[igSheetKey] : Object.values(data[igSheetKey]);
+        igData.forEach((row: any) => {
+          if (!row || typeof row !== 'object') return;
+          const normalizedRow: Record<string, any> = {};
+          Object.keys(row).forEach(key => {
+            normalizedRow[key.replace(/\s/g, '').toLowerCase()] = row[key];
+          });
+          const name = normalizedRow['名字'] || normalizedRow['name'] || normalizedRow['姓名'] || normalizedRow['啦啦隊'];
+          const ig = normalizedRow['ig'] || normalizedRow['連結'] || normalizedRow['url'] || normalizedRow['ig連結'];
+          if (name && ig) {
+            newIgMapping[name.toString().trim().toLowerCase()] = ig.toString().trim();
+          }
+        });
+        delete data[igSheetKey];
+      }
+      setIgMapping((prev) => Object.keys(newIgMapping).length > 0 ? newIgMapping : prev);
+
+      const flatData: GameData[] = [];
+      const yearKeys = Object.keys(data).filter(k => /^\d{4}$/.test(k));
+      const winRateSheetNames = ['年度勝率', '球隊戰績', '勝率', '戰績'];
+      const winRatesSheet = winRateSheetNames.map(name => data[name]).find(sheet => Array.isArray(sheet)) || [];
+      const otherKeys = Object.keys(data).filter(k => !/^\d{4}$/.test(k) && !winRateSheetNames.includes(k));
+      
+      yearKeys.forEach(key => {
+        if (Array.isArray(data[key])) flatData.push(...data[key]);
+      });
+      otherKeys.forEach(key => {
+        if (Array.isArray(data[key])) flatData.push(...data[key]);
+      });
+
+      const uniqueGamesMap = new Map<string, GameData>();
+      [...otherKeys, ...yearKeys].forEach(key => {
+        if (Array.isArray(data[key])) {
+          data[key].forEach((item: GameData) => {
+            if (!item.Date || !item.GameSno) return;
+            const year = item.Date.split('/')[0];
+            const normSno = isNaN(Number(item.GameSno)) ? item.GameSno : Number(item.GameSno);
+            const uniqueKey = `${year}-${normSno}`;
+            uniqueGamesMap.set(uniqueKey, item);
+          });
+        }
+      });
+      
+      const uniqueData = Array.from(uniqueGamesMap.values());
+      const processedData = uniqueData.map(item => {
+        const year = item.Date ? item.Date.split('/')[0] : '';
+        let homeTeam = (item.HomeTeam || '').trim();
+        if (homeTeam.includes('統一') && homeTeam.includes('獅')) homeTeam = '統一7-ELEVEn獅';
+        if (homeTeam === '統一狮') homeTeam = '統一7-ELEVEn獅';
+        if (homeTeam === 'Lamigo桃猿') homeTeam = 'Lamigo桃猿';
+        if (homeTeam === '樂天桃猿') homeTeam = '樂天桃猿';
+        if (homeTeam === '中信兄弟') homeTeam = '中信兄弟';
+        if (homeTeam === '富邦悍將') homeTeam = '富邦悍將';
+        if (homeTeam === '味全龍') homeTeam = '味全龍';
+        
+        let awayTeam = (item.AwayTeam || '').trim();
+        if (awayTeam.includes('統一') && awayTeam.includes('獅')) awayTeam = '統一7-ELEVEn獅';
+        if (awayTeam === '統一狮') awayTeam = '統一7-ELEVEn獅';
+        
+        let stadium = (item.Stadium || '').trim();
+        
+        let winRateInfo;
+        if (winRatesSheet.length > 0) {
+          winRateInfo = winRatesSheet.find((w: any) => {
+            const wYear = String(w['年份'] || '');
+            const wTeam = String(w['球隊'] || '');
+            if (wYear !== year) return false;
+            if (homeTeam === wTeam) return true;
+            const cleanH = homeTeam.replace(/[ \-]/g, '');
+            const cleanW = wTeam.replace(/[ \-]/g, '');
+            return cleanH.includes(cleanW) || cleanW.includes(cleanH) ||
+                   (cleanH.includes('統一') && cleanW.includes('統一')) ||
+                   (cleanH.includes('味全') && cleanW.includes('味全')) ||
+                   (cleanH.includes('兄弟') && cleanW.includes('兄弟')) ||
+                   (cleanH.includes('樂天') && cleanW.includes('樂天')) ||
+                   (cleanH.includes('富邦') && cleanW.includes('富邦')) ||
+                   (cleanH.includes('台鋼') && cleanW.includes('台鋼'));
+          });
+        }
+
+        return {
+          ...item,
+          HomeTeam: homeTeam,
+          AwayTeam: awayTeam,
+          Stadium: stadium,
+          Audience: Number(item.Audience) || 0,
+          'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
+          'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
+          'RainProb(%)': item['RainProb(%)'] !== undefined && item['RainProb(%)'] !== '' ? Number(item['RainProb(%)']) : undefined,
+          Theme: item.Theme || item['主題日'] || '',
+          Url: item.Url || item.URL || item['連結'] || '',
+          Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
+          WinRate: winRateInfo && winRateInfo['勝率'] ? Number(winRateInfo['勝率']) : undefined,
+          Rank: winRateInfo && winRateInfo['排名'] ? Number(winRateInfo['排名']) : undefined,
+        };
+      });
+      
+      setRawData(processedData);
+
+      if (isInitial) {
+        const years = Array.from(new Set(processedData.map(d => d.Date ? d.Date.split('/')[0] : '').filter(Boolean))).sort();
+        if (years.length > 0) {
+          const latestYear = years[years.length - 1];
+          const startIdx = Math.max(0, years.length - 5);
+          setStartYear(years[startIdx]);
+          setEndYear(latestYear);
+        }
+
+        const activeTeams = ['中信兄弟', '味全龍', '統一7-ELEVEn獅', '樂天桃猿', '富邦悍將', '台鋼雄鷹'];
+        const allHomeTeams = new Set(processedData.map(d => d.HomeTeam).filter(Boolean));
+        let defaultTeam = '';
+        for (const t of activeTeams) {
+          if (allHomeTeams.has(t)) {
+            defaultTeam = t;
+            break;
+          }
+        }
+        if (!defaultTeam) {
+          defaultTeam = Array.from(allHomeTeams).sort()[0] as string;
+        }
+        setSelectedOption(defaultTeam);
+        setIsFirstLoad(false);
+      }
+    };
+
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+      const CACHE_NAME = 'cpbl-gas-cache-v1';
+      
       try {
         if (!gasUrl) {
-          // Use mock data
           const mock = generateMockData();
           const flatData = Object.values(mock).flat();
-          // Use Date + GameSno to prevent collisions
           const uniqueData = Array.from(new Map(flatData.map(item => [`${item.Date}-${item.GameSno}`, item])).values());
           setRawData(uniqueData);
+          setLoading(false);
         } else {
-          const response = await fetch(`${gasUrl}${gasUrl.includes('?') ? '&' : '?'}t=${new Date().getTime()}`, {
+          let hasRenderedFromCache = false;
+          let isInitialRender = isFirstLoad;
+          
+          if ('caches' in window) {
+            try {
+              const cache = await caches.open(CACHE_NAME);
+              const cachedResponse = await cache.match(gasUrl);
+              if (cachedResponse) {
+                const cachedData = await cachedResponse.json();
+                processData(JSON.parse(JSON.stringify(cachedData)), isInitialRender);
+                hasRenderedFromCache = true;
+                setLoading(false);
+                isInitialRender = false;
+              }
+            } catch (cacheErr) {}
+          }
+
+          fetch(`${gasUrl}${gasUrl.includes('?') ? '&' : '?'}t=${new Date().getTime()}`, {
             cache: 'no-store'
-          });
-          if (!response.ok) throw new Error('Network response was not ok');
-          const data = await response.json();
-          
-          // Extract IG mapping if the sheet exists
-          const newIgMapping: Record<string, string> = {};
-          const igSheetKey = Object.keys(data).find(k => {
-            const normalized = k.replace(/\s/g, '').toLowerCase();
-            return normalized.includes('啦啦隊ig') || normalized.includes('cheerleadersig') || normalized === 'ig';
-          });
-          
-          if (igSheetKey) {
-            // GAS might return an array of objects or an object of objects depending on how it's parsed
-            const igData = Array.isArray(data[igSheetKey]) ? data[igSheetKey] : Object.values(data[igSheetKey]);
-            igData.forEach((row: any) => {
-              if (!row || typeof row !== 'object') return;
-              
-              // Normalize keys to handle spaces or different cases
-              const normalizedRow: Record<string, any> = {};
-              Object.keys(row).forEach(key => {
-                normalizedRow[key.replace(/\s/g, '').toLowerCase()] = row[key];
-              });
+          })
+          .then(async (response) => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            
+            if ('caches' in window) {
+              const cache = await caches.open(CACHE_NAME);
+              cache.put(gasUrl, new Response(JSON.stringify(data)));
+            }
 
-              // Check various possible column names for Name and IG
-              const name = normalizedRow['名字'] || normalizedRow['name'] || normalizedRow['姓名'] || normalizedRow['啦啦隊'];
-              const ig = normalizedRow['ig'] || normalizedRow['連結'] || normalizedRow['url'] || normalizedRow['ig連結'];
-              
-              if (name && ig) {
-                newIgMapping[name.toString().trim().toLowerCase()] = ig.toString().trim();
+            if (!isMounted) return;
+            processData(JSON.parse(JSON.stringify(data)), isInitialRender);
+            if (!hasRenderedFromCache) {
+              setLoading(false);
+            }
+          })
+          .catch(err => {
+            if (!isMounted) return;
+            if (!hasRenderedFromCache) {
+              let errorMessage = '無法載入資料，請檢查網址或網路連線。';
+              if (err.message === 'Failed to fetch') {
+                errorMessage = '取得資料失敗 (Failed to fetch)。請確認：\n1. GAS 網址是否正確\n2. GAS 部署時「誰可以存取」是否設定為「所有人 (Anyone)」\n3. 網址是否支援跨域請求 (CORS)';
+              } else if (err instanceof Error) {
+                errorMessage = `錯誤: ${err.message}`;
               }
-            });
-            delete data[igSheetKey]; // Remove so it doesn't break game data parsing
-          }
-          setIgMapping(newIgMapping);
-
-          const flatData: GameData[] = [];
-          
-          // Process year sheets first (e.g., 2024, 2025, 2026) so they take precedence
-          const yearKeys = Object.keys(data).filter(k => /^\d{4}$/.test(k));
-          const winRateSheetNames = ['年度勝率', '球隊戰績', '勝率', '戰績'];
-          const winRatesSheet = winRateSheetNames.map(name => data[name]).find(sheet => Array.isArray(sheet)) || [];
-          const otherKeys = Object.keys(data).filter(k => !/^\d{4}$/.test(k) && !winRateSheetNames.includes(k));
-          
-          // Add year data first
-          yearKeys.forEach(key => {
-            if (Array.isArray(data[key])) {
-              flatData.push(...data[key]);
+              setError(errorMessage);
+              console.error(err);
+              setLoading(false);
+            } else {
+              console.error('Background fetch failed, but cached data is available:', err);
             }
           });
-          
-          // Then add other data (team sheets)
-          otherKeys.forEach(key => {
-            if (Array.isArray(data[key])) {
-              flatData.push(...data[key]);
-            }
-          });
-
-          // Use Date + GameSno + HomeTeam to prevent games from overwriting each other
-          // Because we added year sheets first, if a team sheet has the same game, 
-          // Map will overwrite it, which is the OPPOSITE of what we want if year sheets are more up-to-date.
-          // So we should reverse the array before creating the Map, or use a custom merge logic.
-          
-          const uniqueGamesMap = new Map<string, GameData>();
-          
-          // Process in order: team sheets first, then year sheets. 
-          // This way, year sheets (which are processed later in this loop) will overwrite team sheets.
-          [...otherKeys, ...yearKeys].forEach(key => {
-            if (Array.isArray(data[key])) {
-              data[key].forEach((item: GameData) => {
-                if (!item.Date || !item.GameSno) return;
-                const year = item.Date.split('/')[0];
-                // Use only Year and normalized GameSno to uniquely identify a game.
-                // We MUST skip HomeTeam here, otherwise fixing a typo in HomeTeam 
-                // in one sheet won't overwrite the old typo in another sheet!
-                const normSno = isNaN(Number(item.GameSno)) ? item.GameSno : Number(item.GameSno);
-                const uniqueKey = `${year}-${normSno}`;
-                uniqueGamesMap.set(uniqueKey, item);
-              });
-            }
-          });
-          
-          const uniqueData = Array.from(uniqueGamesMap.values());
-          
-          // Ensure numeric values
-          const processedData = uniqueData.map(item => {
-            const year = item.Date ? item.Date.split('/')[0] : '';
-            
-            // Normalize Team names to prevent duplicated options (e.g., from typos in the sheet)
-            let homeTeam = (item.HomeTeam || '').trim();
-            if (homeTeam.includes('統一') && homeTeam.includes('獅')) homeTeam = '統一7-ELEVEn獅';
-            if (homeTeam === '統一狮') homeTeam = '統一7-ELEVEn獅';
-            if (homeTeam === 'Lamigo桃猿') homeTeam = 'Lamigo桃猿';
-            if (homeTeam === '樂天桃猿') homeTeam = '樂天桃猿';
-            if (homeTeam === '中信兄弟') homeTeam = '中信兄弟';
-            if (homeTeam === '富邦悍將') homeTeam = '富邦悍將';
-            if (homeTeam === '味全龍') homeTeam = '味全龍';
-            
-            let awayTeam = (item.AwayTeam || '').trim();
-            if (awayTeam.includes('統一') && awayTeam.includes('獅')) awayTeam = '統一7-ELEVEn獅';
-            if (awayTeam === '統一狮') awayTeam = '統一7-ELEVEn獅';
-            
-            let stadium = (item.Stadium || '').trim();
-            
-            let winRateInfo;
-            if (winRatesSheet.length > 0) {
-              winRateInfo = winRatesSheet.find((w: any) => {
-                const wYear = String(w['年份'] || '');
-                const wTeam = String(w['球隊'] || '');
-                if (wYear !== year) return false;
-                if (homeTeam === wTeam) return true;
-                
-                const cleanH = homeTeam.replace(/[ \-]/g, '');
-                const cleanW = wTeam.replace(/[ \-]/g, '');
-                return cleanH.includes(cleanW) || cleanW.includes(cleanH) ||
-                       (cleanH.includes('統一') && cleanW.includes('統一')) ||
-                       (cleanH.includes('味全') && cleanW.includes('味全')) ||
-                       (cleanH.includes('兄弟') && cleanW.includes('兄弟')) ||
-                       (cleanH.includes('樂天') && cleanW.includes('樂天')) ||
-                       (cleanH.includes('富邦') && cleanW.includes('富邦')) ||
-                       (cleanH.includes('台鋼') && cleanW.includes('台鋼'));
-              });
-            }
-
-            return {
-              ...item,
-              HomeTeam: homeTeam,
-              AwayTeam: awayTeam,
-              Stadium: stadium,
-              Audience: Number(item.Audience) || 0,
-              'MaxTemp(C)': Number(item['MaxTemp(C)']) || 0,
-              'Rainfall(mm)': Number(item['Rainfall(mm)']) || 0,
-              'RainProb(%)': item['RainProb(%)'] !== undefined && item['RainProb(%)'] !== '' ? Number(item['RainProb(%)']) : undefined,
-              Theme: item.Theme || item['主題日'] || '',
-              Url: item.Url || item.URL || item['連結'] || '', // Map URL from column G
-              Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
-              WinRate: winRateInfo && winRateInfo['勝率'] ? Number(winRateInfo['勝率']) : undefined,
-              Rank: winRateInfo && winRateInfo['排名'] ? Number(winRateInfo['排名']) : undefined,
-            };
-          });
-          
-          setRawData(processedData);
-
-          if (isFirstLoad) {
-            // Compute unique years
-            const years = Array.from(new Set(processedData.map(d => d.Date ? d.Date.split('/')[0] : '').filter(Boolean))).sort();
-            if (years.length > 0) {
-              const latestYear = years[years.length - 1];
-              const startIdx = Math.max(0, years.length - 5);
-              setStartYear(years[startIdx]);
-              setEndYear(latestYear);
-            }
-
-            // Find a preferred active team
-            const activeTeams = ['中信兄弟', '味全龍', '統一7-ELEVEn獅', '樂天桃猿', '富邦悍將', '台鋼雄鷹'];
-            const allHomeTeams = new Set(processedData.map(d => d.HomeTeam).filter(Boolean));
-            let defaultTeam = '';
-            for (const t of activeTeams) {
-              if (allHomeTeams.has(t)) {
-                defaultTeam = t;
-                break;
-              }
-            }
-            if (!defaultTeam) {
-              defaultTeam = Array.from(allHomeTeams).sort()[0] as string;
-            }
-            setSelectedOption(defaultTeam);
-
-            setIsFirstLoad(false);
-          }
         }
       } catch (err: any) {
-        let errorMessage = '無法載入資料，請檢查網址或網路連線。';
-        if (err.message === 'Failed to fetch') {
-          errorMessage = '取得資料失敗 (Failed to fetch)。請確認：\n1. GAS 網址是否正確\n2. GAS 部署時「誰可以存取」是否設定為「所有人 (Anyone)」\n3. 網址是否支援跨域請求 (CORS)';
-        } else if (err instanceof Error) {
-          errorMessage = `錯誤: ${err.message}`;
-        }
+        if (!isMounted) return;
+        let errorMessage = '發生未預期的錯誤。';
+        if (err instanceof Error) errorMessage = `錯誤: ${err.message}`;
         setError(errorMessage);
         console.error(err);
-      } finally {
         setLoading(false);
       }
     };
 
     fetchData();
+    return () => { isMounted = false; };
   }, [gasUrl]);
 
   // Update selected option when options change and current is invalid
@@ -455,10 +486,10 @@ export default function App() {
         display: false,
       },
       tooltip: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        titleColor: '#111827',
-        bodyColor: '#4b5563',
-        borderColor: '#e5e7eb',
+        backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+        titleColor: darkMode ? '#f8fafc' : '#111827',
+        bodyColor: darkMode ? '#cbd5e1' : '#4b5563',
+        borderColor: darkMode ? '#475569' : '#e5e7eb',
         borderWidth: 1,
         padding: 16,
         boxPadding: 8,
@@ -524,7 +555,7 @@ export default function App() {
         ticks: {
           maxRotation: 45,
           minRotation: 45,
-          color: '#6b7280',
+          color: darkMode ? '#94a3b8' : '#6b7280',
           font: { family: 'Inter, sans-serif' }
         }
       },
@@ -532,11 +563,11 @@ export default function App() {
         beginAtZero: true,
         border: { display: false },
         grid: {
-          color: '#f3f4f6',
+          color: darkMode ? '#334155' : '#f3f4f6',
           borderDash: [5, 5],
         },
         ticks: {
-          color: '#6b7280',
+          color: darkMode ? '#94a3b8' : '#6b7280',
           font: { family: 'Inter, sans-serif' },
           callback: function(value: any) {
             return value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value;
@@ -685,17 +716,28 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
       {/* Header */}
-      <header className="bg-blue-700 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
+      <header className="bg-blue-700 dark:bg-slate-800 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-10 transition-colors duration-300">
         <div className="flex items-center gap-2">
           <BarChart2 className="w-6 h-6" />
           <h1 className="text-xl font-bold">中職票房分析</h1>
         </div>
         <div className="flex items-center gap-2">
           <button 
+            onClick={() => setDarkMode(!darkMode)}
+            className="p-2 hover:bg-blue-600 dark:hover:bg-slate-700 rounded-full transition-colors"
+            aria-label="切換深色模式"
+          >
+            {darkMode ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            )}
+          </button>
+          <button 
             onClick={() => setShowSettings(!showSettings)}
-            className="p-2 hover:bg-blue-600 rounded-full transition-colors"
+            className="p-2 hover:bg-blue-600 dark:hover:bg-slate-700 rounded-full transition-colors"
             aria-label="設定"
           >
             <Settings className="w-5 h-5" />
@@ -705,8 +747,8 @@ export default function App() {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="bg-white p-4 shadow-md border-b border-gray-200 animate-in slide-in-from-top-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="bg-white dark:bg-slate-800 p-4 shadow-md border-b border-gray-200 dark:border-slate-700 animate-in slide-in-from-top-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             GAS Web App URL (留空則使用測試資料)
           </label>
           <div className="flex gap-2">
@@ -715,7 +757,7 @@ export default function App() {
               value={gasUrl}
               onChange={(e) => setGasUrl(e.target.value)}
               placeholder="https://script.google.com/macros/s/.../exec"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -733,20 +775,20 @@ export default function App() {
               <BarChart2 className="w-8 h-8 text-blue-600 absolute animate-pulse" />
             </div>
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-gray-800">正在讀取最新票房資料...</h3>
-              <p className="text-sm text-gray-500 animate-pulse">這可能需要幾秒鐘的時間，請稍候</p>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">正在讀取最新票房資料...</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">這可能需要幾秒鐘的時間，請稍候</p>
             </div>
           </div>
         ) : (
           <>
             {/* Controls */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">分析維度</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">分析維度</label>
             <select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value as ViewMode)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="homeTeam">各隊主場人數</option>
               <option value="stadium">各球場人數</option>
@@ -756,13 +798,13 @@ export default function App() {
           
           {viewMode !== 'matchup' && (
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {viewMode === 'homeTeam' ? '選擇球隊' : '選擇球場'}
               </label>
               <select
                 value={selectedOption}
                 onChange={(e) => setSelectedOption(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 {options.map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -772,12 +814,12 @@ export default function App() {
           )}
 
           <div className={`space-y-1 ${viewMode === 'matchup' ? 'col-span-2 md:col-span-1' : 'md:col-span-2 lg:col-span-1'}`}>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇年份範圍</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇年份範圍</label>
             <div className="flex items-center gap-2">
               <select
                 value={startYear}
                 onChange={(e) => setStartYear(e.target.value)}
-                className="flex-1 min-w-0 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
+                className="flex-1 min-w-0 p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
               >
                 <option value="All">最早</option>
                 {availableYears.filter(y => y !== 'All').sort().map(y => (
@@ -788,7 +830,7 @@ export default function App() {
               <select
                 value={endYear}
                 onChange={(e) => setEndYear(e.target.value)}
-                className="flex-1 min-w-0 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
+                className="flex-1 min-w-0 p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none truncate"
               >
                 <option value="All">最新</option>
                 {availableYears.filter(y => y !== 'All').sort((a, b) => b.localeCompare(a)).map(y => (
@@ -800,11 +842,11 @@ export default function App() {
 
           {viewMode === 'homeTeam' && (
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇球場</label>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇球場</label>
               <select
                 value={selectedStadiumFilter}
                 onChange={(e) => setSelectedStadiumFilter(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="All">全部球場</option>
                 {availableStadiumsForTeam.filter(s => s !== 'All').map(s => (
@@ -815,11 +857,11 @@ export default function App() {
           )}
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇星期</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇星期</label>
             <select
               value={selectedDayOfWeek}
               onChange={(e) => setSelectedDayOfWeek(e.target.value)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="All">全部星期</option>
               <option value="星期一">星期一</option>
@@ -833,11 +875,11 @@ export default function App() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">主題日篩選</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">主題日篩選</label>
             <select
               value={selectedThemeFilter}
               onChange={(e) => setSelectedThemeFilter(e.target.value)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="All">全部場次</option>
               <option value="ThemeOnly">僅看主題日 ⭐</option>
@@ -846,11 +888,11 @@ export default function App() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">年度勝率篩選</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">年度勝率篩選</label>
             <select
               value={selectedWinRateFilter}
               onChange={(e) => setSelectedWinRateFilter(e.target.value)}
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="All">全部戰績</option>
               <option value=">0.5">勝率 &gt; 0.500 (A段班)</option>
@@ -860,11 +902,11 @@ export default function App() {
 
           {viewMode === 'homeTeam' && (
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">選擇啦啦隊</label>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇啦啦隊</label>
               <select
                 value={selectedCheerleader}
                 onChange={(e) => setSelectedCheerleader(e.target.value)}
-                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="All">全部人員</option>
                 {availableCheerleaders.filter(c => c !== 'All').map(c => (
@@ -880,7 +922,7 @@ export default function App() {
           <button
             onClick={() => setSortMode('date')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'date' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              sortMode === 'date' ? 'bg-gray-800 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
             依日期排序
@@ -888,7 +930,7 @@ export default function App() {
           <button
             onClick={() => setSortMode('audienceDesc')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'audienceDesc' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              sortMode === 'audienceDesc' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
             <Users className="w-4 h-4" /> 人數由高到低
@@ -896,7 +938,7 @@ export default function App() {
           <button
             onClick={() => setSortMode('tempDesc')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'tempDesc' ? 'bg-red-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              sortMode === 'tempDesc' ? 'bg-red-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
             <Thermometer className="w-4 h-4" /> 氣溫由高到低
@@ -904,7 +946,7 @@ export default function App() {
           <button
             onClick={() => setSortMode('rainAsc')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'rainAsc' ? 'bg-cyan-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              sortMode === 'rainAsc' ? 'bg-cyan-500 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
             <CloudRain className="w-4 h-4" /> 降雨量由低到高
@@ -912,7 +954,7 @@ export default function App() {
           <button
             onClick={() => setSortMode('winRateDesc')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'winRateDesc' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              sortMode === 'winRateDesc' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
             <Trophy className="w-4 h-4" /> 年度勝率由高到低
@@ -920,9 +962,9 @@ export default function App() {
         </div>
 
         {/* Chart Area */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col">
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 min-h-[400px] flex flex-col">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
               {selectedOption} - 人數趨勢
               {loading && <span className="text-sm font-normal text-gray-400 animate-pulse">載入中...</span>}
             </h2>
@@ -930,30 +972,47 @@ export default function App() {
             {!loading && chartData.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:flex lg:flex-nowrap gap-3 items-stretch w-full md:w-auto mt-2 md:mt-0">
                 {/* 總場次 */}
-                <div className="col-span-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
-                  <span className="text-slate-500 text-xs font-bold mb-0.5 tracking-wider">總場次</span>
+                <div className="col-span-1 bg-slate-50 dark:bg-slate-900/50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-bold mb-0.5 tracking-wider">總場次</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-slate-800 text-xl font-black">{chartData.length}</span>
-                    <span className="text-slate-500 text-xs font-medium">場</span>
+                    <span className="text-slate-800 dark:text-slate-100 text-xl font-black">{chartData.length}</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">場</span>
                   </div>
                 </div>
                 
                 {/* 總人數 */}
-                <div className="col-span-1 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
-                  <span className="text-emerald-700/80 text-xs font-bold mb-0.5 tracking-wider">總人數</span>
+                <div className="col-span-1 bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                  <span className="text-emerald-700 dark:text-emerald-400/80 text-xs font-bold mb-0.5 tracking-wider">總人數</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-emerald-700 text-xl font-black">{chartData.reduce((sum, d) => sum + d.Audience, 0).toLocaleString()}</span>
-                    <span className="text-emerald-700/80 text-xs font-medium">人</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 text-xl font-black">{chartData.reduce((sum, d) => sum + d.Audience, 0).toLocaleString()}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400/80 text-xs font-medium">人</span>
                   </div>
                 </div>
+
+                {/* 平均年度勝率 */}
+                {viewMode === 'homeTeam' && (
+                  <div className="col-span-1 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
+                    <span className="text-indigo-700 dark:text-indigo-400/80 text-xs font-bold mb-0.5 tracking-wider">平均年度勝率</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-indigo-700 dark:text-indigo-400 text-xl font-black">
+                        {(() => {
+                          const validWinRates = chartData.filter(d => d.WinRate !== undefined).map(d => d.WinRate as number);
+                          if (validWinRates.length === 0) return '-';
+                          const avg = validWinRates.reduce((sum, wr) => sum + wr, 0) / validWinRates.length;
+                          return avg.toFixed(3);
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 {/* 場均人數 (Highlighted) */}
-                <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-5 py-2 flex flex-col items-start shadow-md relative overflow-hidden transition-transform hover:-translate-y-0.5">
+                <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/40 dark:to-orange-900/40 border border-amber-200 dark:border-amber-800 rounded-xl px-5 py-2 flex flex-col items-start shadow-md relative overflow-hidden transition-transform hover:-translate-y-0.5">
                   <div className="absolute left-0 top-0 w-1.5 h-full bg-amber-400"></div>
-                  <span className="text-amber-800/70 text-xs font-bold mb-0.5 tracking-wider">場均人數</span>
+                  <span className="text-amber-800/70 dark:text-amber-500 text-xs font-bold mb-0.5 tracking-wider">場均人數</span>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-amber-600 text-3xl font-black drop-shadow-sm">{Math.round(chartData.reduce((sum, d) => sum + d.Audience, 0) / chartData.length).toLocaleString()}</span>
-                    <span className="text-amber-800/70 text-sm font-medium">人</span>
+                    <span className="text-amber-600 dark:text-amber-400 text-3xl font-black drop-shadow-sm">{Math.round(chartData.reduce((sum, d) => sum + d.Audience, 0) / chartData.length).toLocaleString()}</span>
+                    <span className="text-amber-800/70 dark:text-amber-500 text-sm font-medium">人</span>
                   </div>
                 </div>
               </div>
@@ -965,27 +1024,27 @@ export default function App() {
               {error}
             </div>
           ) : chartData.length === 0 && !loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-500 py-16">
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 py-16">
               <div className="bg-gray-50 p-6 rounded-full mb-4">
                 <BarChart2 className="w-12 h-12 text-gray-300" />
               </div>
-              <p className="text-lg font-medium text-gray-700 mb-1">找不到符合的賽事資料</p>
+              <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-1">找不到符合的賽事資料</p>
               <p className="text-sm text-gray-400">目前設定的篩選條件太嚴格，請嘗試放寬年份、星期或主題日限制。</p>
             </div>
           ) : viewMode === 'matchup' ? (
             <div className="flex flex-col flex-1 w-full bg-white p-4 rounded-xl border border-gray-100 shadow-sm mt-4 overflow-x-auto">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 text-center">對戰組合場均人數矩陣 (Heatmap)</h3>
-              <div className="text-xs text-gray-500 mb-2 flex justify-end items-center gap-2">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 text-center">對戰組合場均人數矩陣 (Heatmap)</h3>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 flex justify-end items-center gap-2">
                 <span>圖例顏色深淺代表平均人數多寡（顏色越橘越多人）</span>
               </div>
               <table className="w-full text-center border-collapse text-sm min-w-[600px]">
                 <thead>
                   <tr>
-                    <th className="p-3 border border-gray-200 bg-slate-50 text-slate-600 font-semibold w-24 whitespace-nowrap">
+                    <th className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 text-slate-600 font-semibold w-24 whitespace-nowrap">
                       主場 \ 客場
                     </th>
                     {Array.from(new Set([...chartData.map(d=>d.HomeTeam), ...chartData.map(d=>d.AwayTeam)])).filter(Boolean).sort().map(team => (
-                      <th key={`col-${team}`} className="p-3 border border-gray-200 bg-slate-50 text-slate-700 font-medium">
+                      <th key={`col-${team}`} className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 text-slate-700 font-medium">
                         {team}
                       </th>
                     ))}
@@ -1001,12 +1060,12 @@ export default function App() {
 
                     return (
                       <tr key={`row-${home}`}>
-                        <td className="p-3 border border-gray-200 bg-slate-50 font-semibold text-slate-700 whitespace-nowrap">
+                        <td className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 font-semibold text-slate-700 whitespace-nowrap">
                           {home} <span className="text-xs text-slate-400 font-normal">(主)</span>
                         </td>
                         {allTeams.map(away => {
                           if (home === away) {
-                            return <td key={`cell-${home}-${away}`} className="p-3 border border-gray-200 bg-gray-100 text-gray-300">-</td>;
+                            return <td key={`cell-${home}-${away}`} className="p-3 border border-gray-200 bg-gray-100 dark:bg-slate-700 text-gray-300">-</td>;
                           }
                           const matchGames = chartData.filter(d => d.HomeTeam === home && d.AwayTeam === away);
                           if (matchGames.length === 0) {
@@ -1044,7 +1103,7 @@ export default function App() {
             </div>
           ) : (
             <div className="flex flex-col flex-1 w-full">
-              <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-gray-600">
+              <div className="flex flex-wrap items-center gap-4 mb-4 text-xs text-gray-600 dark:text-gray-300">
                 <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-[#3b82f6] border-2 border-white mr-1.5 shadow-sm"></span>一般場次</div>
                 <div className="flex items-center"><span className="w-4 h-4 rounded-full bg-[#f59e0b] border-[3px] border-[#fef3c7] mr-1.5 shadow-sm"></span>主題日</div>
                 <div className="flex items-center"><span className="w-3.5 h-3.5 rounded-full bg-[#ef4444] border-2 border-white mr-1.5 shadow-sm"></span>最高氣溫</div>
@@ -1062,14 +1121,14 @@ export default function App() {
 
         {/* Data Grid Area */}
         {!loading && chartData.length > 0 && viewMode !== 'matchup' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col mt-4">
-            <div className="p-4 border-b border-gray-100 bg-slate-50 flex justify-between items-center">
-              <h2 className="text-sm font-bold text-gray-700">詳細數據清單</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden flex flex-col mt-4">
+            <div className="p-4 border-b border-gray-100 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+              <h2 className="text-sm font-bold text-gray-700 dark:text-gray-300">詳細數據清單</h2>
               <span className="text-xs text-gray-400 font-medium">點擊列查看完整資訊</span>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 sticky top-0 z-10 text-gray-500 font-semibold text-xs border-b border-gray-200 shadow-sm">
+                <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10 text-gray-500 dark:text-gray-400 font-semibold text-xs border-b border-gray-200 shadow-sm">
                   <tr>
                     <th className="px-4 py-3">日期</th>
                     <th className="px-4 py-3">對戰組合</th>
@@ -1085,12 +1144,12 @@ export default function App() {
                     const isMaxTemp = maxTemp !== null && game['MaxTemp(C)'] === maxTemp && maxTemp > 0;
                     const isMaxRain = maxRain !== null && game['Rainfall(mm)'] === maxRain && maxRain > 0;
                     return (
-                      <tr key={`${game.Date}-${game.GameSno}-${idx}`} className="hover:bg-blue-50/60 cursor-pointer transition-colors" onClick={() => setSelectedGame(game)}>
-                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{game.Date}</td>
-                        <td className="px-4 py-3 font-medium text-gray-800">
+                      <tr key={`${game.Date}-${game.GameSno}-${idx}`} className="hover:bg-blue-50/60 dark:hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => setSelectedGame(game)}>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{game.Date}</td>
+                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
                           {game.AwayTeam} <span className="text-gray-400 font-normal mx-1 text-xs">vs</span> {game.HomeTeam}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{game.Stadium}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{game.Stadium}</td>
                         <td className="px-4 py-3 text-right font-bold text-blue-600">{game.Audience.toLocaleString()}</td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -1098,8 +1157,8 @@ export default function App() {
                             {isMaxRain && <CloudRain className="w-4 h-4 text-cyan-500" title="最高降雨量" />}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-amber-600 text-xs font-medium">{game.Theme || '-'}</td>
-                        <td className="px-4 py-3 text-gray-500 text-xs truncate max-w-[150px]" title={game.Cheerleaders}>{game.Cheerleaders || '-'}</td>
+                        <td className="px-4 py-3 text-amber-600 dark:text-amber-400 text-xs font-medium">{game.Theme || '-'}</td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs truncate max-w-[150px]" title={game.Cheerleaders}>{game.Cheerleaders || '-'}</td>
                       </tr>
                     );
                   })}
@@ -1116,7 +1175,7 @@ export default function App() {
       {selectedGame && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedGame(null)}>
           <div 
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-blue-700 p-4 flex justify-between items-center text-white">
@@ -1132,40 +1191,40 @@ export default function App() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
                 <div className="col-span-2 flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">日期</span>
+                  <span className="text-gray-500 dark:text-gray-400">日期</span>
                   <span className="font-medium text-gray-900">{selectedGame.Date}</span>
                 </div>
                 <div className="col-span-2 flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">對戰組合</span>
+                  <span className="text-gray-500 dark:text-gray-400">對戰組合</span>
                   <span className="font-medium text-gray-900">{selectedGame.AwayTeam} vs {selectedGame.HomeTeam}</span>
                 </div>
                 <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">場地</span>
+                  <span className="text-gray-500 dark:text-gray-400">場地</span>
                   <span className="font-medium text-gray-900">{selectedGame.Stadium}</span>
                 </div>
                 <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">觀眾人數</span>
+                  <span className="text-gray-500 dark:text-gray-400">觀眾人數</span>
                   <span className="font-medium text-blue-600">{selectedGame.Audience.toLocaleString()} 人</span>
                 </div>
                 <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">最高氣溫</span>
+                  <span className="text-gray-500 dark:text-gray-400">最高氣溫</span>
                   <span className="font-medium text-red-500">{selectedGame['MaxTemp(C)']}°C</span>
                 </div>
                 <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-gray-500">降雨量</span>
+                  <span className="text-gray-500 dark:text-gray-400">降雨量</span>
                   <span className="font-medium text-cyan-600">{selectedGame['Rainfall(mm)']} mm</span>
                 </div>
                 
                 {selectedGame['RainProb(%)'] !== undefined && (
                   <div className="flex items-center justify-between border-b pb-2">
-                    <span className="text-gray-500">降雨機率</span>
+                    <span className="text-gray-500 dark:text-gray-400">降雨機率</span>
                     <span className="font-medium text-blue-500">{selectedGame['RainProb(%)']}%</span>
                   </div>
                 )}
                 
                 {selectedGame.Theme && (
                   <div className="col-span-2 flex items-center justify-between border-b pb-2">
-                    <span className="text-gray-500">主題日</span>
+                    <span className="text-gray-500 dark:text-gray-400">主題日</span>
                     <span className="font-medium text-amber-500 flex items-center gap-1">
                       {selectedGame.Theme} ⭐
                     </span>
@@ -1174,7 +1233,7 @@ export default function App() {
                 
                 {selectedGame.Cheerleaders && (
                   <div className="col-span-2 flex flex-col gap-2 border-b pb-3">
-                    <span className="text-gray-500">啦啦隊班表</span>
+                    <span className="text-gray-500 dark:text-gray-400">啦啦隊班表</span>
                     <div className="flex flex-wrap gap-2">
                       {selectedGame.Cheerleaders.split(/[,、，]/).map(c => c.trim()).filter(Boolean).map((name, idx) => {
                         const igUrl = igMapping[name.toLowerCase()];
@@ -1192,7 +1251,7 @@ export default function App() {
                           );
                         }
                         return (
-                          <span key={idx} className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+                          <span key={idx} className="inline-flex items-center px-2.5 py-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-full text-sm font-medium">
                             {name}
                           </span>
                         );
@@ -1210,7 +1269,7 @@ export default function App() {
                     href={selectedGame.Url || selectedGame.URL} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center w-full gap-2 py-3 px-4 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-medium transition-colors"
+                    className="flex items-center justify-center w-full gap-2 py-3 px-4 bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 hover:bg-blue-100 rounded-xl font-medium transition-colors"
                   >
                     <ExternalLink className="w-4 h-4" />
                     本場賽事 CPBL 官網詳細資訊
