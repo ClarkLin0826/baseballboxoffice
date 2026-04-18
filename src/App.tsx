@@ -44,7 +44,7 @@ export default function App() {
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>(searchParams.get('day') || 'All');
   const [selectedThemeFilter, setSelectedThemeFilter] = useState<string>(searchParams.get('theme') || 'All');
   const [selectedCheerleader, setSelectedCheerleader] = useState<string>(searchParams.get('cheer') || 'All');
-  const [selectedWinRateFilter, setSelectedWinRateFilter] = useState<string>(searchParams.get('wr') || 'All');
+  const [selectedGameResult, setSelectedGameResult] = useState<string>(searchParams.get('res') || 'All');
   const [showNextWeek, setShowNextWeek] = useState(searchParams.get('nw') === 'true');
   const [sortMode, setSortMode] = useState<SortMode>((searchParams.get('sort') as SortMode) || 'date');
   
@@ -79,13 +79,13 @@ export default function App() {
     if (selectedDayOfWeek !== 'All') params.set('day', selectedDayOfWeek);
     if (selectedThemeFilter !== 'All') params.set('theme', selectedThemeFilter);
     if (selectedCheerleader !== 'All') params.set('cheer', selectedCheerleader);
-    if (selectedWinRateFilter !== 'All') params.set('wr', selectedWinRateFilter);
+    if (selectedGameResult !== 'All') params.set('res', selectedGameResult);
     if (showNextWeek) params.set('nw', 'true');
     if (sortMode !== 'date') params.set('sort', sortMode);
     
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);
-  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedWinRateFilter, showNextWeek, sortMode, isFirstLoad]);
+  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameResult, showNextWeek, sortMode, isFirstLoad]);
 
   // Default to system preference if we don't have a saved one
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function App() {
     setSelectedDayOfWeek('All');
     setSelectedThemeFilter('All');
     setSelectedCheerleader('All');
-    setSelectedWinRateFilter('All');
+    setSelectedGameResult('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
   }, [viewMode]);
 
@@ -194,23 +194,16 @@ export default function App() {
         
         let stadium = (item.Stadium || '').trim();
         
-        let winRateInfo;
-        if (winRatesSheet.length > 0) {
-          winRateInfo = winRatesSheet.find((w: any) => {
-            const wYear = String(w['年份'] || '');
-            const wTeam = String(w['球隊'] || '');
-            if (wYear !== year) return false;
-            if (homeTeam === wTeam) return true;
-            const cleanH = homeTeam.replace(/[ \-]/g, '');
-            const cleanW = wTeam.replace(/[ \-]/g, '');
-            return cleanH.includes(cleanW) || cleanW.includes(cleanH) ||
-                   (cleanH.includes('統一') && cleanW.includes('統一')) ||
-                   (cleanH.includes('味全') && cleanW.includes('味全')) ||
-                   (cleanH.includes('兄弟') && cleanW.includes('兄弟')) ||
-                   (cleanH.includes('樂天') && cleanW.includes('樂天')) ||
-                   (cleanH.includes('富邦') && cleanW.includes('富邦')) ||
-                   (cleanH.includes('台鋼') && cleanW.includes('台鋼'));
-          });
+        // Parse scores and result
+        let awayScore = (item as any).AwayScore !== undefined && (item as any).AwayScore !== '' ? Number((item as any).AwayScore) : undefined;
+        let homeScore = (item as any).HomeScore !== undefined && (item as any).HomeScore !== '' ? Number((item as any).HomeScore) : undefined;
+        let homeResult = (item as any).HomeResult || (item as any)['主場結果'] || '';
+
+        // Auto-calculate HomeResult if not explicitly provided but scores are available
+        if (!homeResult && awayScore !== undefined && homeScore !== undefined) {
+           if (homeScore > awayScore) homeResult = '勝';
+           else if (homeScore < awayScore) homeResult = '敗';
+           else homeResult = '和';
         }
 
         return {
@@ -225,8 +218,9 @@ export default function App() {
           Theme: item.Theme || item['主題日'] || '',
           Url: item.Url || item.URL || item['連結'] || '',
           Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
-          WinRate: winRateInfo && winRateInfo['勝率'] ? Number(winRateInfo['勝率']) : undefined,
-          Rank: winRateInfo && winRateInfo['排名'] ? Number(winRateInfo['排名']) : undefined,
+          AwayScore: awayScore,
+          HomeScore: homeScore,
+          HomeResult: homeResult,
         };
       });
       
@@ -532,10 +526,11 @@ export default function App() {
                                (game.Cheerleaders && game.Cheerleaders.split(/[,、]/).map(c => c.trim()).includes(selectedCheerleader));
       if (!matchCheerleader) return false;
 
-      const matchWinRate = selectedWinRateFilter === 'All' ? true :
-                           selectedWinRateFilter === '>0.5' ? (game.WinRate !== undefined && game.WinRate >= 0.5) :
-                           selectedWinRateFilter === '<0.5' ? (game.WinRate !== undefined && game.WinRate < 0.5) : true;
-      if (!matchWinRate) return false;
+      const matchGameResult = selectedGameResult === 'All' ? true :
+                              selectedGameResult === 'W' ? game.HomeResult === '勝' :
+                              selectedGameResult === 'L' ? game.HomeResult === '敗' :
+                              selectedGameResult === 'T' ? game.HomeResult === '和' : true;
+      if (!matchGameResult) return false;
 
       // Filter out games with 0 audience (assuming unplayed games) only in normal mode
       if (!showNextWeek && game.Audience === 0) return false;
@@ -546,11 +541,11 @@ export default function App() {
     filtered = [...filtered].sort((a, b) => {
       switch (sortMode) {
         case 'winRateDesc': {
-          const wrA = a.WinRate !== undefined ? a.WinRate : -1;
-          const wrB = b.WinRate !== undefined ? b.WinRate : -1;
-          if (wrA !== wrB) return wrB - wrA; // Descending win rate
+          const diffA = (a.HomeScore || 0) - (a.AwayScore || 0);
+          const diffB = (b.HomeScore || 0) - (b.AwayScore || 0);
+          if (diffA !== diffB) return diffB - diffA; // Descending point difference
           
-          // Fallback to date sorting if win rate is same or missing
+          // Fallback to date sorting if point difference is same
           const timeDiff = new Date(a.Date).getTime() - new Date(b.Date).getTime();
           if (timeDiff === 0) {
             const snoA = isNaN(Number(a.GameSno)) ? 0 : Number(a.GameSno);
@@ -579,7 +574,7 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedWinRateFilter, showNextWeek]);
+  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameResult, showNextWeek]);
 
   const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
   const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
@@ -587,7 +582,7 @@ export default function App() {
   const exportToCSV = () => {
     if (chartData.length === 0) return;
     
-    const headers = ['日期', '主場球隊', '客場球隊', '球場', '觀眾人數', '最高氣溫(C)', '降雨量(mm)', '降雨機率(%)', '主題日', '啦啦隊', '勝率'];
+    const headers = ['日期', '主場球隊', '客場球隊', '球場', '觀眾人數', '最高氣溫(C)', '降雨量(mm)', '降雨機率(%)', '主題日', '啦啦隊', '客場分數', '主場分數', '主場結果'];
     const csvRows = [headers.join(',')];
     
     chartData.forEach(game => {
@@ -602,7 +597,9 @@ export default function App() {
         game['RainProb(%)'] || '',
         `"${game.Theme || ''}"`,
         `"${game.Cheerleaders || ''}"`,
-        game.WinRate !== undefined ? game.WinRate : ''
+        game.AwayScore !== undefined ? game.AwayScore : '',
+        game.HomeScore !== undefined ? game.HomeScore : '',
+        game.HomeResult || ''
       ];
       csvRows.push(row.join(','));
     });
@@ -685,21 +682,16 @@ export default function App() {
           }
         });
 
-        // Also resolve WinRate from igMapping logic or other objects if necessary
-        // For simplicity, we just use the existing fallback
-        let winRateInfo;
-        if (data.winRates) {
-           winRateInfo = data.winRates.find((w: any) => {
-             const cleanH = homeTeam.replace(/[^一-龥]/g, '');
-             const cleanW = (w['球隊'] || '').replace(/[^一-龥]/g, '');
-             return (cleanH.includes('中信') && cleanW.includes('中信')) ||
-                    (cleanH.includes('兄弟') && cleanW.includes('中信')) ||
-                    (cleanH.includes('味全') && cleanW.includes('味全')) ||
-                    (cleanH.includes('統一') && cleanW.includes('統一')) ||
-                    (cleanH.includes('樂天') && cleanW.includes('樂天')) ||
-                    (cleanH.includes('富邦') && cleanW.includes('富邦')) ||
-                    (cleanH.includes('台鋼') && cleanW.includes('台鋼'));
-           });
+        // Parse scores and result
+        let awayScore = (item as any).AwayScore !== undefined && (item as any).AwayScore !== '' ? Number((item as any).AwayScore) : undefined;
+        let homeScore = (item as any).HomeScore !== undefined && (item as any).HomeScore !== '' ? Number((item as any).HomeScore) : undefined;
+        let homeResult = (item as any).HomeResult || (item as any)['主場結果'] || '';
+
+        // Auto-calculate HomeResult if not explicitly provided but scores are available
+        if (!homeResult && awayScore !== undefined && homeScore !== undefined) {
+           if (homeScore > awayScore) homeResult = '勝';
+           else if (homeScore < awayScore) homeResult = '敗';
+           else homeResult = '和';
         }
 
         return {
@@ -714,8 +706,9 @@ export default function App() {
           Theme: item.Theme || item['主題日'] || '',
           Url: item.Url || item.URL || item['連結'] || '',
           Cheerleaders: item.Cheerleaders || item['啦啦隊'] || item['啦啦隊班表'] || '',
-          WinRate: winRateInfo && winRateInfo['勝率'] ? Number(winRateInfo['勝率']) : undefined,
-          Rank: winRateInfo && winRateInfo['排名'] ? Number(winRateInfo['排名']) : undefined,
+          AwayScore: awayScore,
+          HomeScore: homeScore,
+          HomeResult: homeResult,
         };
       });
       
@@ -795,10 +788,17 @@ export default function App() {
               `場次：${data.GameSno}`,
               data.Audience ? `人數：${data.Audience.toLocaleString()}` : `人數：尚未開打`,
               `場地：${data.Stadium}`,
-              `對戰：${data.AwayTeam} vs ${data.HomeTeam}`,
-              tempLabel,
-              rainLabel
             ];
+
+            if (data.HomeResult) {
+              tooltipLines.push(`比分：客 ${data.AwayTeam} ${data.AwayScore ?? '-'} vs ${data.HomeScore ?? '-'} ${data.HomeTeam} (${data.HomeResult})`);
+            } else if (data.AwayScore !== undefined && data.HomeScore !== undefined) {
+              tooltipLines.push(`比分：客 ${data.AwayTeam} ${data.AwayScore} vs ${data.HomeScore} ${data.HomeTeam}`);
+            } else {
+              tooltipLines.push(`對戰：${data.AwayTeam} vs ${data.HomeTeam}`);
+            }
+
+            tooltipLines.push(tempLabel, rainLabel);
 
             if (data['RainProb(%)'] !== undefined) {
               tooltipLines.push(`降雨機率：${data['RainProb(%)']}%`);
@@ -879,19 +879,6 @@ export default function App() {
   });
 
   const uniqueYearsInChart = Array.from(new Set(chartData.map(d => d.Date.split('/')[0])));
-  const winRatesByYear = new Map<string, number>();
-  chartData.forEach(d => {
-    if (d.WinRate !== undefined) {
-      winRatesByYear.set(d.Date.split('/')[0], d.WinRate);
-    }
-  });
-
-  // Only display the average win rate if every year present in the chart has win rate data matched
-  // (e.g. if the user selects 2020-2025, it displays; if they select All, and 2014 lacks it, hide).
-  const allYearsHaveWinRate = uniqueYearsInChart.length > 0 && uniqueYearsInChart.every(year => winRatesByYear.has(year));
-  const avgWinRate = allYearsHaveWinRate 
-    ? Array.from(winRatesByYear.values()).reduce((a, b) => a + b, 0) / winRatesByYear.size 
-    : null;
 
   // Dynamic tension to prevent Bezier curve loops/overshoots when data points are too dense
   const getCurveTension = (dataLength: number) => {
@@ -1207,15 +1194,16 @@ export default function App() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">年度勝率篩選</label>
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">比賽結果篩選</label>
             <select
-              value={selectedWinRateFilter}
-              onChange={(e) => setSelectedWinRateFilter(e.target.value)}
+              value={selectedGameResult}
+              onChange={(e) => setSelectedGameResult(e.target.value)}
               className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             >
-              <option value="All">全部戰績</option>
-              <option value=">0.5">勝率 &gt; 0.500 (A段班)</option>
-              <option value="<0.5">勝率 &lt; 0.500 (B段班)</option>
+              <option value="All">全部賽事</option>
+              <option value="W">主場勝</option>
+              <option value="L">主場敗</option>
+              <option value="T">主場和</option>
             </select>
           </div>
 
@@ -1296,7 +1284,7 @@ export default function App() {
               sortMode === 'winRateDesc' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
             }`}
           >
-            <Trophy className="w-4 h-4" /> 年度勝率由高到低
+            <Trophy className="w-4 h-4" /> 主場勝分差由高到低
           </button>
 
           <div className="flex-1"></div>
@@ -1342,14 +1330,15 @@ export default function App() {
                 {/* 平均年度勝率 */}
                 {viewMode === 'homeTeam' && (
                   <div className="col-span-1 bg-indigo-50 dark:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 rounded-xl px-4 py-2 flex flex-col items-start shadow-sm transition-transform hover:-translate-y-0.5">
-                    <span className="text-indigo-700 dark:text-indigo-400/80 text-xs font-bold mb-0.5 tracking-wider">平均年度勝率</span>
+                    <span className="text-indigo-700 dark:text-indigo-400/80 text-xs font-bold mb-0.5 tracking-wider">主場勝率</span>
                     <div className="flex items-baseline gap-1">
                       <span className="text-indigo-700 dark:text-indigo-400 text-xl font-black">
                         {(() => {
-                          const validWinRates = chartData.filter(d => d.WinRate !== undefined).map(d => d.WinRate as number);
-                          if (validWinRates.length === 0) return '-';
-                          const avg = validWinRates.reduce((sum, wr) => sum + wr, 0) / validWinRates.length;
-                          return avg.toFixed(3);
+                          const gamesWithResult = chartData.filter(d => d.HomeResult === '勝' || d.HomeResult === '敗');
+                          if (gamesWithResult.length === 0) return '-';
+                          const wins = gamesWithResult.filter(d => d.HomeResult === '勝').length;
+                          const winRate = wins / gamesWithResult.length;
+                          return winRate.toFixed(3);
                         })()}
                       </span>
                     </div>
@@ -1580,8 +1569,23 @@ export default function App() {
                 </div>
                 <div className="col-span-2 flex items-center justify-between border-b dark:border-slate-700 pb-2">
                   <span className="text-gray-500 dark:text-gray-400">對戰組合</span>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{selectedGame.AwayTeam} vs {selectedGame.HomeTeam}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">客 {selectedGame.AwayTeam} vs 主 {selectedGame.HomeTeam}</span>
                 </div>
+                {selectedGame.HomeResult ? (
+                  <div className="col-span-2 flex items-center justify-between border-b dark:border-slate-700 pb-2 bg-indigo-50/50 dark:bg-indigo-900/20 px-2 rounded -mx-2">
+                    <span className="text-gray-500 dark:text-gray-400">比賽結果</span>
+                    <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                      {selectedGame.AwayScore ?? '-'} : {selectedGame.HomeScore ?? '-'} (主場{selectedGame.HomeResult})
+                    </span>
+                  </div>
+                ) : (selectedGame.AwayScore !== undefined && selectedGame.HomeScore !== undefined) ? (
+                  <div className="col-span-2 flex items-center justify-between border-b dark:border-slate-700 pb-2 bg-indigo-50/50 dark:bg-indigo-900/20 px-2 rounded -mx-2">
+                    <span className="text-gray-500 dark:text-gray-400">比賽結果</span>
+                    <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                      {selectedGame.AwayScore} : {selectedGame.HomeScore}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between border-b dark:border-slate-700 pb-2">
                   <span className="text-gray-500 dark:text-gray-400">場地</span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">{selectedGame.Stadium}</span>
