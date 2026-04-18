@@ -12,7 +12,8 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { generateMockData, GameData } from './mockData';
-import { Settings, BarChart2, CloudRain, Thermometer, Users, X, ExternalLink, Trophy, Calendar, Download, RefreshCw, Filter, Share2, Check, TrendingUp, TrendingDown } from 'lucide-react';
+import { Settings, BarChart2, CloudRain, Thermometer, Users, X, ExternalLink, Trophy, Calendar, RefreshCw, Filter, Share2, Check, TrendingUp, TrendingDown, Camera } from 'lucide-react';
+import { toBlob } from 'html-to-image';
 
 ChartJS.register(
   CategoryScale,
@@ -695,40 +696,51 @@ export default function App() {
   const maxTemp = chartData.length > 0 ? Math.max(...chartData.map(d => d['MaxTemp(C)'])) : null;
   const maxRain = chartData.length > 0 ? Math.max(...chartData.map(d => d['Rainfall(mm)'])) : null;
 
-  const exportToCSV = () => {
-    if (chartData.length === 0) return;
+  const exportChartImage = async () => {
+    const chartContainer = document.getElementById('exportable-chart-area');
+    if (!chartContainer) return;
     
-    const headers = ['日期', '主場球隊', '客場球隊', '球場', '觀眾人數', '最高氣溫(C)', '降雨量(mm)', '降雨機率(%)', '主題日', '啦啦隊', '客場分數', '主場分數', '主場結果'];
-    const csvRows = [headers.join(',')];
-    
-    chartData.forEach(game => {
-      const row = [
-        game.Date,
-        game.HomeTeam,
-        game.AwayTeam,
-        game.Stadium,
-        game.Audience || 0,
-        game['MaxTemp(C)'] || 0,
-        game['Rainfall(mm)'] || 0,
-        game['RainProb(%)'] || '',
-        `"${game.Theme || ''}"`,
-        `"${game.Cheerleaders || ''}"`,
-        game.AwayScore !== undefined ? game.AwayScore : '',
-        game.HomeScore !== undefined ? game.HomeScore : '',
-        game.HomeResult || ''
-      ];
-      csvRows.push(row.join(','));
-    });
-    
-    const csvContent = "\uFEFF" + csvRows.join('\n'); // Add BOM for Excel
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `CPBL_Data_${selectedOption}_${startYear}-${endYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const blob = await toBlob(chartContainer, {
+        backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+        pixelRatio: 2 // High resolution
+      });
+      
+      if (!blob) throw new Error("Failed to create image blob");
+
+      // Try using Web Share API if supported and on mobile (it can share images natively)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], `CPBL_Chart_${selectedOption}_${startYear}-${endYear}.png`, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: '中職票房分析',
+              text: `${selectedOption} 的分析數據`,
+              files: [file]
+            });
+            return; // Success natively
+          } catch (error) {
+            if ((error as any).name !== 'AbortError') {
+               console.log("Web Share failed, falling back to download", error);
+            } else {
+               return; // User canceled
+            }
+          }
+        }
+      }
+
+      // Fallback: Download image
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `CPBL_Chart_${selectedOption}_${startYear}-${endYear}.png`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Failed to export image', error);
+      alert('圖片匯出失敗，請重試或回報問題。');
+    }
   };
 
   const handleForceRefresh = async () => {
@@ -1339,18 +1351,19 @@ export default function App() {
 
           <div className="flex-1"></div>
           <button
-            onClick={exportToCSV}
+            onClick={exportChartImage}
             disabled={chartData.length === 0}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               chartData.length === 0 ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
             }`}
+             title="儲存為圖片 / 分享圖表至社群平台"
           >
-            <Download className="w-4 h-4" /> 下載清單 (CSV)
+            <Camera className="w-4 h-4" /> 截圖分享圖表
           </button>
         </div>
 
         {/* Chart Area */}
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 min-h-[400px] flex flex-col">
+        <div id="exportable-chart-area" className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 min-h-[400px] flex flex-col">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
