@@ -700,6 +700,24 @@ export default function App() {
     const chartContainer = document.getElementById('exportable-chart-area');
     if (!chartContainer) return;
     
+    // Temporarily fix scroll position for html-to-image
+    const scrollContainers = chartContainer.querySelectorAll('.overflow-x-auto');
+    const scrollState: { el: HTMLElement, transform: string, transition: string }[] = [];
+    
+    scrollContainers.forEach(container => {
+      const scrollLeft = container.scrollLeft;
+      if (scrollLeft > 0 && container.firstElementChild) {
+        const inner = container.firstElementChild as HTMLElement;
+        scrollState.push({ 
+           el: inner, 
+           transform: inner.style.transform,
+           transition: inner.style.transition
+        });
+        inner.style.transition = 'none';
+        inner.style.transform = `translateX(-${scrollLeft}px)`;
+      }
+    });
+
     try {
       const blob = await toBlob(chartContainer, {
         backgroundColor: darkMode ? '#1e293b' : '#ffffff',
@@ -708,20 +726,23 @@ export default function App() {
       
       if (!blob) throw new Error("Failed to create image blob");
 
-      // Try using Web Share API if supported and on mobile (it can share images natively)
-      if (navigator.share && navigator.canShare) {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      let sharedNative = false;
+
+      // Try using Web Share API if supported and on mobile (it can share images natively with text)
+      if (navigator.share && navigator.canShare && isMobile) {
         const file = new File([blob], `CPBL_Chart_${selectedOption}_${startYear}-${endYear}.png`, { type: 'image/png' });
         if (navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
               title: '中職票房分析',
-              text: `${selectedOption} 的分析數據`,
+              text: `看看 ${selectedOption} 的票房數據與分析！\n\n📊 完整圖表：${window.location.href}`,
               files: [file]
             });
-            return; // Success natively
+            sharedNative = true;
           } catch (error) {
             if ((error as any).name !== 'AbortError') {
-               console.log("Web Share failed, falling back to download", error);
+               console.log("Web Share failed, falling back to clipboard", error);
             } else {
                return; // User canceled
             }
@@ -729,17 +750,42 @@ export default function App() {
         }
       }
 
-      // Fallback: Download image
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `CPBL_Chart_${selectedOption}_${startYear}-${endYear}.png`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
+      // Desktop logic: Try to copy image to clipboard for easy Ctrl+V sharing
+      if (!sharedNative) {
+        let copiedToClipboard = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            copiedToClipboard = true;
+            alert('圖表截圖已複製到剪貼簿！🎉\n\n您可以直接到 Facebook / Threads 按 Ctrl+V 貼上分享！\n發文時歡迎順手貼上網站連結與朋友分享唷：\n' + window.location.href);
+          } catch (err) {
+            console.warn("Clipboard write failed, downloading instead...", err);
+          }
+        }
+
+        // Fallback: Download image if clipboard write is blocked or unsupported
+        if (!copiedToClipboard) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = `CPBL_Chart_${selectedOption}_${startYear}-${endYear}.png`;
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+          alert('圖表已下載至您的電腦！\n發片時可以隨文附上網站連結喔：\n' + window.location.href);
+        }
+      }
       
     } catch (error) {
       console.error('Failed to export image', error);
       alert('圖片匯出失敗，請重試或回報問題。');
+    } finally {
+      // Revert scroll transforms
+      scrollState.forEach(({ el, transform, transition }) => {
+        el.style.transform = transform;
+        el.style.transition = transition;
+      });
     }
   };
 
