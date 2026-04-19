@@ -1758,9 +1758,64 @@ export default function App() {
                 <div className="flex items-center"><span className="w-3.5 h-3.5 rounded-full bg-[#06b6d4] border-2 border-white mr-1.5 shadow-sm"></span>最高降雨量</div>
                 <div className="flex items-center"><span className="w-3.5 h-3.5 rounded-full bg-[#a855f7] border-2 border-white mr-1.5 shadow-sm"></span>最高溫且最高降雨</div>
               </div>
-              <div className="w-full overflow-x-auto pb-4 custom-scrollbar">
-                <div className="relative h-[300px] md:h-[400px]" style={{ width: safeChartWidth }}>
-                  <Line options={chartOptions} data={chartJsData} />
+              <div className="flex w-full pb-4 items-stretch">
+                {chartJsData && (
+                  <div className="relative h-[300px] md:h-[400px] w-[60px] sm:w-[70px] shrink-0 bg-white dark:bg-slate-800 z-10 border-r border-gray-100 dark:border-slate-700">
+                    <Line 
+                      options={{
+                        ...chartOptions,
+                        plugins: {
+                          ...chartOptions.plugins,
+                          legend: { display: false },
+                          tooltip: { enabled: false }
+                        },
+                        scales: {
+                          ...chartOptions.scales,
+                          x: {
+                            ...chartOptions.scales.x,
+                            ticks: {
+                              ...chartOptions.scales.x.ticks,
+                              color: 'transparent'
+                            },
+                            grid: { display: false },
+                            border: { display: false }
+                          }
+                        }
+                      }} 
+                      data={{
+                        ...chartJsData,
+                        datasets: chartJsData.datasets.map(d => ({
+                          ...d,
+                          borderColor: 'transparent',
+                          backgroundColor: 'transparent',
+                          pointBackgroundColor: 'transparent',
+                          pointBorderColor: 'transparent',
+                          pointHoverBackgroundColor: 'transparent',
+                          pointHoverBorderColor: 'transparent'
+                        }))
+                      }} 
+                    />
+                  </div>
+                )}
+                <div className="flex-1 overflow-x-auto custom-scrollbar">
+                  <div className="relative h-[300px] md:h-[400px]" style={{ width: safeChartWidth }}>
+                    <Line 
+                      options={{
+                        ...chartOptions,
+                        scales: {
+                          ...chartOptions.scales,
+                          y: {
+                            ...chartOptions.scales.y,
+                            ticks: {
+                              ...chartOptions.scales.y.ticks,
+                              display: false
+                            }
+                          }
+                        }
+                      }} 
+                      data={chartJsData} 
+                    />
+                  </div>
                 </div>
               </div>
             </div>
