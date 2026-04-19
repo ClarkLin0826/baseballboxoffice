@@ -1458,7 +1458,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                {showNextWeek ? `${selectedOption} - 未來一週賽程預覽` : viewMode === 'matchup' ? '對戰組合場均人數矩陣 (Heatmap)' : viewMode === 'cheerleaderWinRate' ? '女孩主場勝率排名' : `${selectedOption} - 人數趨勢`}
+                {showNextWeek ? `${selectedOption} - 未來一週賽程預覽` : viewMode === 'matchup' ? '對戰組合場均人數矩陣 (Heatmap)' : viewMode === 'cheerleaderWinRate' ? '啦啦隊主場勝率排名' : `${selectedOption} - 人數趨勢`}
                 {loading && <span className="text-sm font-normal text-gray-400 animate-pulse">載入中...</span>}
               </h2>
               {!showNextWeek && viewMode !== 'matchup' && viewMode !== 'cheerleaderWinRate' && chartData.length > 0 && (
@@ -1615,34 +1615,34 @@ export default function App() {
           ) : viewMode === 'cheerleaderWinRate' ? (
             <div className="flex flex-col flex-1 w-full bg-white dark:bg-slate-800 p-2 md:p-6 mb-2">
               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 text-center">
-                {selectedOption === 'All' ? '全聯盟女孩主場勝率排行' : `${selectedOption} 女孩主場勝率排行`}
+                {selectedOption === 'All' ? '全聯盟啦啦隊主場勝率排行' : `${selectedOption} 啦啦隊主場勝率排行`}
               </h3>
               <div className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">
                 計算方式為主場勝場數除以總場次（不含延賽，至少參與 5 場）
               </div>
 
               {cheerleaderStats.length === 0 ? (
-                <div className="text-center text-gray-400 py-10">目前沒有符合條件的女孩勝率資料。</div>
+                <div className="text-center text-gray-400 py-10">目前沒有符合條件的啦啦隊勝率資料。</div>
               ) : (
-                <div className="w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700 mx-auto max-w-4xl shadow-sm">
-                  <table className="w-full text-center text-sm table-fixed min-w-[500px]">
+                <div className="w-full overflow-x-auto custom-scrollbar rounded-xl border border-gray-200 dark:border-slate-700 mx-auto max-w-4xl shadow-sm">
+                  <table className="w-full text-center text-sm table-auto min-w-[600px]">
                     <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300">
                       <tr>
-                        <th className="py-3 px-2 font-bold border-b border-gray-200 dark:border-slate-700 w-16">排名</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 text-left">女孩名稱</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-24">參與場次</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-24">主場隊伍勝</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-32">勝率</th>
+                        <th className="py-3 px-2 font-bold border-b border-gray-200 dark:border-slate-700 w-16 whitespace-nowrap">排名</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 text-left sticky left-0 z-10 bg-slate-50 dark:bg-slate-800/80 whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)]">啦啦隊名稱</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-24 whitespace-nowrap">參與場次</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-24 whitespace-nowrap">主場隊伍勝</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 w-32 whitespace-nowrap">勝率</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 bg-white dark:bg-slate-800">
                       {cheerleaderStats.map((stat, idx) => (
                         <tr key={stat.name} className="hover:bg-blue-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                          <td className="py-3 px-2 font-bold text-gray-400 dark:text-gray-500">#{idx + 1}</td>
-                          <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200 text-left">{stat.name}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{stat.games} 場</td>
-                          <td className="py-3 px-4 text-emerald-600 dark:text-emerald-500 font-semibold">{stat.wins} 勝</td>
-                          <td className="py-3 px-4 text-rose-500 dark:text-rose-400 font-bold text-lg">
+                          <td className="py-3 px-2 font-bold text-gray-400 dark:text-gray-500 whitespace-nowrap">#{idx + 1}</td>
+                          <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200 text-left sticky left-0 z-10 bg-white dark:bg-slate-800 group-hover:bg-blue-50/50 dark:group-hover:bg-slate-700/30 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] whitespace-nowrap">{stat.name}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">{stat.games} 場</td>
+                          <td className="py-3 px-4 text-emerald-600 dark:text-emerald-500 font-semibold whitespace-nowrap">{stat.wins} 勝</td>
+                          <td className="py-3 px-4 text-rose-500 dark:text-rose-400 font-bold text-lg whitespace-nowrap">
                             {(stat.rate * 100).toFixed(1)}%
                           </td>
                         </tr>
@@ -1708,25 +1708,25 @@ export default function App() {
               </div>
 
               {/* Data Table */}
-              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700 mx-auto w-full max-w-4xl shadow-sm">
-                 <table className="w-full text-center text-sm table-fixed">
+              <div className="overflow-x-auto custom-scrollbar rounded-xl border border-gray-200 dark:border-slate-700 mx-auto w-full max-w-4xl shadow-sm">
+                 <table className="w-full text-center text-sm table-auto min-w-[500px]">
                     <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300">
                       <tr>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700">年度</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700">總場次</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700">總數</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700">場均人數</th>
-                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700">年度成長率 (YoY)</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">年度</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">總場次</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">總數</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">場均人數</th>
+                        <th className="py-3 px-4 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">年度成長率 (YoY)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 bg-white dark:bg-slate-800">
                       {[...yearlyStats].reverse().map(stat => (
                         <tr key={stat.year} className="hover:bg-blue-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">{stat.year}</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{stat.count} 場</td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{stat.total.toLocaleString()}</td>
-                          <td className="py-3 px-4 text-blue-600 dark:text-blue-400 font-bold text-base">{stat.avg.toLocaleString()}</td>
-                          <td className="py-3 px-4 font-medium">
+                          <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{stat.year}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">{stat.count} 場</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">{stat.total.toLocaleString()}</td>
+                          <td className="py-3 px-4 text-blue-600 dark:text-blue-400 font-bold text-base whitespace-nowrap">{stat.avg.toLocaleString()}</td>
+                          <td className="py-3 px-4 font-medium whitespace-nowrap">
                             {stat.growth !== null ? (
                                stat.growth > 0 ? (
                                   <span className="text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 py-1 px-2 rounded-full w-24 mx-auto">
