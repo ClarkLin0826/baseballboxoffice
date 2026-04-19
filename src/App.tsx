@@ -114,6 +114,9 @@ export default function App() {
     setSelectedCheerleader('All');
     setSelectedGameResult('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
+    if (viewMode === 'matchup' || viewMode === 'cheerleaderWinRate') {
+      setShowNextWeek(false);
+    }
   }, [viewMode]);
 
   // Reset stadium filter when selected team changes
@@ -1371,25 +1374,30 @@ export default function App() {
 
         {/* Sorting */}
         <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={() => {
-              const nextState = !showNextWeek;
-              setShowNextWeek(nextState);
-              if (nextState) {
-                setSortMode('date');
-              }
-            }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-              showNextWeek 
-                ? 'bg-fuchsia-600 text-white shadow-md transform scale-105' 
-                : 'bg-white dark:bg-slate-800 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-200 dark:border-fuchsia-800 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-900/40'
-            }`}
-          >
-            <Calendar className="w-4 h-4" /> 
-            {showNextWeek ? '返回歷史資料' : '預覽未來一週'}
-          </button>
-          
-          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+          {viewMode !== 'matchup' && viewMode !== 'cheerleaderWinRate' && (
+            <>
+              <button
+                onClick={() => {
+                  const nextState = !showNextWeek;
+                  setShowNextWeek(nextState);
+                  if (nextState) {
+                    setSortMode('date');
+                    setChartType('trend'); // Fix yearly comparison bug
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  showNextWeek 
+                    ? 'bg-fuchsia-600 text-white shadow-md transform scale-105' 
+                    : 'bg-white dark:bg-slate-800 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-200 dark:border-fuchsia-800 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-900/40'
+                }`}
+              >
+                <Calendar className="w-4 h-4" /> 
+                {showNextWeek ? '返回歷史資料' : '預覽未來一週'}
+              </button>
+              
+              <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+            </>
+          )}
 
           <button
             onClick={() => setSortMode('date')}
