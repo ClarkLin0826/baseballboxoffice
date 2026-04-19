@@ -1832,16 +1832,16 @@ export default function App() {
       </main>
 
       {/* Sponsorship Section */}
-      <div className="flex justify-center my-6 px-4">
-        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl shadow-sm border border-emerald-100 dark:border-slate-700 max-w-lg w-full text-center hover:shadow-md transition-shadow">
-          <p className="text-gray-700 dark:text-gray-300 font-medium mb-5 text-sm sm:text-base leading-relaxed">
-            請開發者買杯進場看球的啤酒 🍺，<br className="hidden sm:block" />支持持續更新數據！
+      <div className="flex justify-center my-8 px-4">
+        <div className="bg-gradient-to-b from-white to-emerald-50/30 dark:from-slate-800 dark:to-slate-800/80 p-5 sm:p-6 rounded-2xl shadow-sm border border-emerald-100/80 dark:border-emerald-900/30 max-w-sm w-full text-center hover:shadow-md transition-all duration-300">
+          <p className="text-gray-600 dark:text-gray-300 font-medium mb-4 text-sm leading-relaxed">
+            請開發者買杯進場看球的啤酒 🍺<br className="hidden sm:block" />支持持續更新數據！
           </p>
           <a
             href="https://p.ecpay.com.tw/96AD638"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-full sm:w-auto bg-[#00C66B] hover:bg-[#00ab5d] text-white px-8 py-3 rounded-full font-bold text-base shadow-lg shadow-[#00C66B]/30 hover:shadow-[#00C66B]/50 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
+            className="inline-flex items-center justify-center w-full sm:w-auto bg-[#00C66B] hover:bg-[#00ab5d] text-white px-6 py-2.5 rounded-full font-semibold text-sm shadow-md shadow-[#00C66B]/20 hover:shadow-[#00C66B]/40 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
           >
             以綠界 ECPay 贊助支持
           </a>
