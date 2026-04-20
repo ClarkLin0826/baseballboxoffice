@@ -926,6 +926,7 @@ export default function App() {
         display: false,
       },
       tooltip: {
+        enabled: typeof window !== 'undefined' ? window.innerWidth > 768 : true,
         backgroundColor: darkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         titleColor: darkMode ? '#f8fafc' : '#111827',
         bodyColor: darkMode ? '#cbd5e1' : '#4b5563',
@@ -981,7 +982,15 @@ export default function App() {
             }
 
             if (data.Cheerleaders) {
-              tooltipLines.push(`啦啦隊：${data.Cheerleaders}`);
+              const names = data.Cheerleaders.split(/[,、，]/).map(n => n.trim()).filter(Boolean);
+              if (names.length > 6) {
+                tooltipLines.push(`啦啦隊：`);
+                for (let i = 0; i < names.length; i += 6) {
+                  tooltipLines.push(`　${names.slice(i, i + 6).join(', ')}`);
+                }
+              } else {
+                tooltipLines.push(`啦啦隊：${names.join(', ')}`);
+              }
             }
 
             tooltipLines.push('');
