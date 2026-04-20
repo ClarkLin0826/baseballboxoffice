@@ -1680,19 +1680,41 @@ export default function App() {
               <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-8 text-center">歷年場均人數與成長率</h3>
               
               {/* CSS Bar Chart */}
-              <div className="w-full overflow-x-auto custom-scrollbar pb-6 pt-16 mt-2">
-                <div className="flex items-end justify-start sm:justify-center gap-4 sm:gap-10 h-64 min-w-max px-4 mb-4 border-b-2 border-gray-100 dark:border-slate-700 relative">
-                   {/* Y-axis labels simplified */}
-                   <div className="hidden sm:flex absolute left-0 top-0 h-full flex-col justify-between text-xs text-gray-400 -ml-2 -mt-2 sticky left-0 z-20 bg-white dark:bg-slate-800 bg-opacity-90 pr-2">
-                      <span>{Math.max(...yearlyStats.map(s => s.avg)).toLocaleString()}</span>
-                      <span>0</span>
+              <div className="w-full relative pb-10 pt-4 mt-2">
+                {/* Max label floating independent of the scrolling container so it always shows */}
+                <div className="absolute top-0 right-4 sm:right-10 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-full text-amber-600 dark:text-amber-400 text-xs font-medium shadow-sm flex items-center gap-1.5 z-20">
+                   <TrendingUp className="w-3.5 h-3.5" /> 年最高場均: {Math.max(...yearlyStats.map(s => s.avg)).toLocaleString()}
+                </div>
+                
+                <div className="flex h-64 relative ml-8 sm:ml-12 border-l border-b border-gray-200 dark:border-slate-600 mt-16">
+                   {/* Y-axis Guides and Ticks (Fixed outside scrolling area) */}
+                   <div className="absolute left-0 top-0 w-full h-full flex flex-col justify-between pointer-events-none z-0">
+                      {[100, 75, 50, 25, 0].map(percent => {
+                        const maxAvg = Math.max(...yearlyStats.map(s => s.avg), 1000); // Minimum scale of 1000
+                        // Round max to nearest thousand for cleaner ticks
+                        const tickMax = Math.ceil(maxAvg / 1000) * 1000;
+                        const val = Math.round((tickMax * percent) / 100);
+                        
+                        return (
+                          <div key={percent} className="w-full border-t border-gray-100 dark:border-slate-700/50 relative">
+                             <span className="absolute -top-2.5 -left-2 -translate-x-full pr-2 text-[10px] sm:text-xs text-gray-400 font-medium whitespace-nowrap">
+                               {val.toLocaleString()}
+                             </span>
+                          </div>
+                        )
+                      })}
                    </div>
-                   {yearlyStats.map((stat, idx) => {
-                      const maxAvg = Math.max(...yearlyStats.map(s => s.avg));
-                      const heightPercent = maxAvg > 0 ? (stat.avg / maxAvg) * 100 : 0;
-                      return (
-                        <div key={stat.year} className="flex flex-col justify-end items-center gap-2 group relative w-12 sm:w-16 md:w-20 h-full shrink-0">
-                         {/* Tooltip visible on hover inside the bar area */}
+
+                   {/* Scrollable Bar Area */}
+                   <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar flex min-w-0 h-[352px] -mt-[64px] -mb-[32px]">
+                     <div className="flex items-end gap-4 sm:gap-8 md:gap-12 px-6 sm:px-10 h-[352px] min-w-max pb-[34px]">
+                       {yearlyStats.map((stat, idx) => {
+                          const maxAvg = Math.max(...yearlyStats.map(s => s.avg), 1000);
+                          const tickMax = Math.ceil(maxAvg / 1000) * 1000;
+                          const heightPercent = tickMax > 0 ? (stat.avg / tickMax) * 100 : 0;
+                          return (
+                            <div key={stat.year} className="flex flex-col justify-end items-center gap-2 group relative w-10 sm:w-16 md:w-20 h-64 shrink-0 z-10 pointer-events-auto">
+                             {/* Tooltip visible on hover inside the bar area */}
                          <div className="absolute -top-16 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 text-xs py-1.5 px-3 rounded shadow-lg pointer-events-none whitespace-nowrap z-10 flex flex-col items-center">
                             <span className="font-bold text-sm tracking-wide">{stat.avg.toLocaleString()} 人</span>
                             {stat.growth !== null && (
@@ -1713,10 +1735,14 @@ export default function App() {
                          </div>
                          
                          {/* X-axis Label */}
-                         <span className="text-sm font-bold text-slate-600 dark:text-slate-300 mt-2">{stat.year}</span>
+                         <div className="absolute -bottom-8 whitespace-nowrap">
+                           <span className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">{stat.year}</span>
+                         </div>
                       </div>
                     )
                  })}
+                     </div>
+                   </div>
                 </div>
               </div>
 
