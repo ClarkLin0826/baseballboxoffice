@@ -59,6 +59,18 @@ export default function App() {
   const [chartType, setChartType] = useState<'trend' | 'yoy'>('trend');
   const [toastContent, setToastContent] = useState<{title: string, message: string, urlText?: string} | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [loadingTextIndex, setLoadingTextIndex] = useState(0);
+
+  // Rotate loading text
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading && rawData.length === 0) {
+      interval = setInterval(() => {
+        setLoadingTextIndex(prev => (prev + 1) % 2);
+      }, 2500);
+    }
+    return () => clearInterval(interval);
+  }, [loading, rawData.length]);
 
   const handleShare = async () => {
     try {
@@ -1230,8 +1242,10 @@ export default function App() {
               {/* 中心圖示 */}
               <BarChart2 className="w-8 h-8 text-blue-600 absolute animate-pulse" />
             </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">正在讀取最新票房資料...</h3>
+            <div className="text-center space-y-2 h-16">
+              <h3 key={loadingTextIndex} className="text-xl font-bold text-gray-800 dark:text-gray-100 animate-in fade-in zoom-in-95 duration-500">
+                {loadingTextIndex === 0 ? "正在讀取最新票房資料..." : "優先載入最新三年資料..."}
+              </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">這可能需要幾秒鐘的時間，請稍候</p>
             </div>
           </div>
