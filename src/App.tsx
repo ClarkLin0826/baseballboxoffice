@@ -70,6 +70,38 @@ export default function App() {
     }
   };
 
+  const handleOptionChange = (newValue: string) => {
+    setSelectedOption(newValue);
+    setIsFirstLoad(false);
+
+    if (newValue === 'All') {
+      setStartYear('All');
+      setEndYear('All');
+    } else {
+      let activeGames: GameData[] = [];
+      if (viewMode === 'homeTeam' || viewMode === 'cheerleaderWinRate') {
+        activeGames = rawData.filter(d => d.HomeTeam === newValue || d.AwayTeam === newValue);
+      } else if (viewMode === 'stadium') {
+        activeGames = rawData.filter(d => d.Stadium === newValue);
+      }
+      
+      if (activeGames.length > 0) {
+        // Collect all valid years (e.g., '2004' from '2004/05/11')
+        const years = activeGames
+          .map(d => parseInt(d.Date ? d.Date.substring(0, 4) : '0', 10))
+          .filter(y => y > 0 && !isNaN(y));
+          
+        if (years.length > 0) {
+          const minYear = Math.min(...years).toString();
+          const maxYear = Math.max(...years).toString();
+          
+          setStartYear(minYear);
+          setEndYear(maxYear);
+        }
+      }
+    }
+  };
+
   // Sync state to URL
   useEffect(() => {
     if (isFirstLoad) return;
@@ -1264,7 +1296,7 @@ export default function App() {
               </label>
               <select
                 value={selectedOption}
-                onChange={(e) => setSelectedOption(e.target.value)}
+                onChange={(e) => handleOptionChange(e.target.value)}
                 className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 {options.map(opt => (
