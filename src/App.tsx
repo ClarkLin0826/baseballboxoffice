@@ -1465,7 +1465,7 @@ export default function App() {
         </div>
 
         {/* Chart Area */}
-        <div id="exportable-chart-area" className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 min-h-[400px] flex flex-col">
+        <div id="exportable-chart-area" className={`bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col ${showNextWeek ? '' : 'min-h-[400px]'}`}>
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
@@ -1666,12 +1666,14 @@ export default function App() {
               )}
             </div>
           ) : showNextWeek ? (
-            <div className="flex items-center justify-center p-10 mt-10 rounded-xl bg-fuchsia-50/50 dark:bg-slate-900 border border-fuchsia-100 dark:border-slate-800">
-              <div className="text-center space-y-4 max-w-sm">
-                <Calendar className="w-16 h-16 text-fuchsia-400 dark:text-fuchsia-600 mx-auto" />
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">未來一週天氣與賽程</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm">下方清單已為您篩選出未來七天的賽程，請往下捲動查閱詳細的啦啦隊班表與降雨機率預報。</p>
+            <div className="flex items-center justify-center p-4 sm:p-6 mt-2 rounded-xl bg-fuchsia-50/50 dark:bg-slate-900 border border-fuchsia-100 dark:border-slate-800">
+              <div className="flex flex-row items-center gap-4 max-w-lg">
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm shrink-0">
+                  <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-fuchsia-500 dark:text-fuchsia-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-gray-100 mb-1">未來一週天氣與賽程</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm leading-relaxed">下方清單已為您篩選出未來七天的賽程，請往下滑動查閱詳細的啦啦隊班表與降雨機率預報。</p>
                 </div>
               </div>
             </div>
