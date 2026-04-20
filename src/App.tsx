@@ -1440,14 +1440,6 @@ export default function App() {
           >
             <CloudRain className="w-4 h-4" /> 降雨量由低到高
           </button>
-          <button
-            onClick={() => setSortMode('winRateDesc')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              sortMode === 'winRateDesc' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'
-            }`}
-          >
-            <Trophy className="w-4 h-4" /> 主場勝分差由高到低
-          </button>
 
           <div className="flex-1"></div>
           <button
@@ -1557,15 +1549,15 @@ export default function App() {
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 flex justify-end items-center gap-2">
                 <span>圖例顏色深淺代表平均人數多寡（顏色越橘越多人）</span>
               </div>
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-center border-collapse text-sm min-w-[600px]">
+              <div className="overflow-x-auto w-full pb-2">
+                <table className="w-full text-center border-separate border-spacing-0 text-sm min-w-[600px] border-t border-l border-gray-200 dark:border-slate-700">
                 <thead>
                   <tr>
-                    <th className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 text-slate-600 font-semibold w-24 sm:w-32 whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)]">
+                    <th className="p-3 border-b border-r border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-200 font-semibold w-24 sm:w-32 whitespace-nowrap sticky left-0 z-20 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)] bg-clip-padding">
                       主場 \ 客場
                     </th>
                     {Array.from(new Set([...chartData.map(d=>d.HomeTeam), ...chartData.map(d=>d.AwayTeam)])).filter(Boolean).sort().map(team => (
-                      <th key={`col-${team}`} className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 text-slate-700 font-medium">
+                      <th key={`col-${team}`} className="p-3 border-b border-r border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-medium bg-clip-padding">
                         {team}
                       </th>
                     ))}
@@ -1581,16 +1573,16 @@ export default function App() {
 
                     return (
                       <tr key={`row-${home}`}>
-                        <td className="p-3 border border-gray-200 bg-slate-50 dark:bg-slate-900/50 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap sticky left-0 z-10 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)] w-24 sm:w-32">
+                        <td className="p-3 border-b border-r border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap sticky left-0 z-10 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)] w-24 sm:w-32 bg-clip-padding">
                           {home} <span className="text-[10px] sm:text-xs text-slate-400 font-normal">(主)</span>
                         </td>
                         {allTeams.map(away => {
                           if (home === away) {
-                            return <td key={`cell-${home}-${away}`} className="p-3 border border-gray-200 bg-gray-100 dark:bg-slate-700 text-gray-300">-</td>;
+                            return <td key={`cell-${home}-${away}`} className="p-3 border-b border-r border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 text-gray-300 dark:text-slate-500 bg-clip-padding">-</td>;
                           }
                           const matchGames = chartData.filter(d => d.HomeTeam === home && d.AwayTeam === away);
                           if (matchGames.length === 0) {
-                            return <td key={`cell-${home}-${away}`} className="p-3 border border-gray-200 text-gray-300">-</td>;
+                            return <td key={`cell-${home}-${away}`} className="p-3 border-b border-r border-gray-200 dark:border-slate-700 text-gray-300 dark:text-slate-600 bg-white dark:bg-slate-800 bg-clip-padding">-</td>;
                           }
                           const avg = Math.round(matchGames.reduce((acc, curr) => acc + curr.Audience, 0) / matchGames.length);
                           
@@ -1604,7 +1596,7 @@ export default function App() {
                           const textColor = intensity > 0.6 ? '#fff' : '#1e293b';
 
                           return (
-                            <td key={`cell-${home}-${away}`} className="border border-gray-200 transition-colors hover:ring-2 hover:ring-inset hover:ring-blue-500 cursor-default" style={{ backgroundColor: bgColor, color: textColor }}>
+                            <td key={`cell-${home}-${away}`} className="border-b border-r border-gray-200 dark:border-slate-700 transition-colors hover:ring-2 hover:ring-inset hover:ring-blue-500 cursor-default bg-clip-padding" style={{ backgroundColor: bgColor, color: textColor }}>
                               <div className="flex flex-col items-center justify-center p-2">
                                 <span className="font-bold text-[15px]">{avg.toLocaleString()}</span>
                                 <span className="text-[10px] opacity-75 mt-0.5">({matchGames.length}場)</span>
