@@ -1831,10 +1831,10 @@ export default function App() {
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10 text-gray-500 dark:text-gray-400 font-semibold text-xs border-b border-gray-200 shadow-sm">
+                <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-30 text-gray-500 dark:text-gray-400 font-semibold text-xs border-b border-gray-200 shadow-sm">
                   <tr>
-                    <th className="px-4 py-3">日期</th>
-                    <th className="px-4 py-3">對戰組合</th>
+                    <th className="px-2 sm:px-3 py-3 sticky left-0 z-40 bg-slate-50 dark:bg-slate-800 w-[65px] min-w-[65px] max-w-[65px] sm:w-[100px] sm:min-w-[100px] sm:max-w-[100px]">日期</th>
+                    <th className="px-2 sm:px-3 py-3 sticky left-[65px] sm:left-[100px] z-40 bg-slate-50 dark:bg-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)] w-[95px] min-w-[95px] max-w-[95px] sm:w-auto sm:min-w-[auto] sm:max-w-none">對戰組合</th>
                     <th className="px-4 py-3">球場</th>
                     <th className="px-4 py-3 text-right">人數</th>
                     <th className="px-4 py-3 text-center">氣象</th>
@@ -1860,10 +1860,20 @@ export default function App() {
                     const isMaxTemp = maxTemp !== null && game['MaxTemp(C)'] === maxTemp && maxTemp > 0;
                     const isMaxRain = maxRain !== null && game['Rainfall(mm)'] === maxRain && maxRain > 0;
                     return (
-                      <tr key={`${game.Date}-${game.GameSno}-${idx}`} className="hover:bg-blue-50/60 dark:hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => setSelectedGame(game)}>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{game.Date}</td>
-                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
-                          {game.AwayTeam} <span className="text-gray-400 font-normal mx-1 text-xs">vs</span> {game.HomeTeam}
+                      <tr key={`${game.Date}-${game.GameSno}-${idx}`} className="group hover:bg-blue-50/60 dark:hover:bg-slate-700 cursor-pointer transition-colors" onClick={() => setSelectedGame(game)}>
+                        <td className="px-2 sm:px-3 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs sticky left-0 z-20 bg-white dark:bg-slate-800 group-hover:bg-blue-50/60 dark:group-hover:bg-slate-700 transition-colors w-[65px] min-w-[65px] max-w-[65px] sm:w-[100px] sm:min-w-[100px] sm:max-w-[100px] align-middle">
+                          <div className="flex flex-col sm:block text-[10px] sm:text-xs leading-[1.3]">
+                            <span className="sm:hidden text-gray-400 scale-[0.85] origin-left">{game.Date.substring(0, 4)}</span>
+                            <span className="sm:hidden font-semibold">{game.Date.substring(5)}</span>
+                            <span className="hidden sm:inline">{game.Date}</span>
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-3 font-medium text-gray-800 dark:text-gray-100 sticky left-[65px] sm:left-[100px] z-20 bg-white dark:bg-slate-800 group-hover:bg-blue-50/60 dark:group-hover:bg-slate-700 transition-colors shadow-[2px_0_4px_-1px_rgba(0,0,0,0.1)] w-[95px] min-w-[95px] max-w-[95px] sm:w-auto sm:min-w-[auto] sm:max-w-none overflow-hidden align-middle">
+                          <div className="flex flex-col sm:flex-row sm:items-center text-[10px] sm:text-sm leading-[1.3] gap-0.5 sm:gap-0">
+                            <span className="truncate w-full">{game.AwayTeam}</span>
+                            <span className="hidden sm:inline text-gray-400 font-normal mx-1 text-xs">vs</span>
+                            <span className="truncate w-full">{game.HomeTeam}</span>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{game.Stadium}</td>
                         <td className="px-4 py-3 text-right font-bold text-blue-600">
