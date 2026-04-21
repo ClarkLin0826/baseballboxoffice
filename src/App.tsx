@@ -45,7 +45,6 @@ export default function App() {
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<string>(searchParams.get('day') || 'All');
   const [selectedThemeFilter, setSelectedThemeFilter] = useState<string>(searchParams.get('theme') || 'All');
   const [selectedCheerleader, setSelectedCheerleader] = useState<string>(searchParams.get('cheer') || 'All');
-  const [selectedGameResult, setSelectedGameResult] = useState<string>(searchParams.get('res') || 'All');
   const [showNextWeek, setShowNextWeek] = useState(searchParams.get('nw') === 'true');
   const [sortMode, setSortMode] = useState<SortMode>((searchParams.get('sort') as SortMode) || 'date');
   
@@ -150,13 +149,12 @@ export default function App() {
     if (selectedDayOfWeek !== 'All') params.set('day', selectedDayOfWeek);
     if (selectedThemeFilter !== 'All') params.set('theme', selectedThemeFilter);
     if (selectedCheerleader !== 'All') params.set('cheer', selectedCheerleader);
-    if (selectedGameResult !== 'All') params.set('res', selectedGameResult);
     if (showNextWeek) params.set('nw', 'true');
     if (sortMode !== 'date') params.set('sort', sortMode);
     
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);
-  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameResult, showNextWeek, sortMode, isFirstLoad]);
+  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, showNextWeek, sortMode, isFirstLoad]);
 
   // Default to system preference if we don't have a saved one
   useEffect(() => {
@@ -180,7 +178,6 @@ export default function App() {
     setSelectedDayOfWeek('All');
     setSelectedThemeFilter('All');
     setSelectedCheerleader('All');
-    setSelectedGameResult('All');
     setSelectedOption(''); // Reset selected option to trigger auto-select
     if (viewMode === 'matchup' || viewMode === 'cheerleaderWinRate') {
       setShowNextWeek(false);
@@ -623,12 +620,6 @@ export default function App() {
                                (game.Cheerleaders && game.Cheerleaders.split(/[,、]/).map(c => c.trim()).includes(selectedCheerleader));
       if (!matchCheerleader) return false;
 
-      const matchGameResult = selectedGameResult === 'All' ? true :
-                              selectedGameResult === 'W' ? game.HomeResult === '勝' :
-                              selectedGameResult === 'L' ? game.HomeResult === '敗' :
-                              selectedGameResult === 'T' ? game.HomeResult === '和' : true;
-      if (!matchGameResult) return false;
-
       // Filter out games with 0 audience (assuming unplayed games) only in normal mode
       if (!showNextWeek && game.Audience === 0) return false;
 
@@ -671,7 +662,7 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameResult, showNextWeek]);
+  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, showNextWeek]);
 
   const dataForYoY = useMemo(() => {
     return rawData.filter(game => {
@@ -699,17 +690,11 @@ export default function App() {
                                (game.Cheerleaders && game.Cheerleaders.split(/[,、]/).map(c => c.trim()).includes(selectedCheerleader));
       if (!matchCheerleader) return false;
 
-      const matchGameResult = selectedGameResult === 'All' ? true :
-                              selectedGameResult === 'W' ? game.HomeResult === '勝' :
-                              selectedGameResult === 'L' ? game.HomeResult === '敗' :
-                              selectedGameResult === 'T' ? game.HomeResult === '和' : true;
-      if (!matchGameResult) return false;
-
       if (game.Audience === 0) return false;
 
       return true;
     });
-  }, [rawData, viewMode, selectedOption, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameResult, showNextWeek]);
+  }, [rawData, viewMode, selectedOption, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, showNextWeek]);
 
   const yearlyStats = useMemo(() => {
     if (dataForYoY.length === 0) return [];
@@ -1398,20 +1383,6 @@ export default function App() {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">比賽結果篩選</label>
-            <select
-              value={selectedGameResult}
-              onChange={(e) => setSelectedGameResult(e.target.value)}
-              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="All">全部賽事</option>
-              <option value="W">主場勝</option>
-              <option value="L">主場敗</option>
-              <option value="T">主場和</option>
-            </select>
-          </div>
-
           {(viewMode === 'homeTeam' || viewMode === 'cheerleaderWinRate') && (
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇啦啦隊</label>
@@ -1540,7 +1511,6 @@ export default function App() {
                   {selectedDayOfWeek !== 'All' && <span>📅 {selectedDayOfWeek}</span>}
                   {selectedThemeFilter === 'ThemeOnly' && <span>⭐ 僅主題日</span>}
                   {selectedThemeFilter === 'NormalOnly' && <span>⚾ 僅一般例行賽</span>}
-                  {selectedGameResult !== 'All' && <span>🏆 比賽結果: {selectedGameResult === 'W' ? '主場勝' : selectedGameResult === 'L' ? '主場敗' : '和局'}</span>}
                   {selectedCheerleader !== 'All' && <span>💃 {selectedCheerleader}</span>}
                 </div>
               </div>
@@ -1686,7 +1656,7 @@ export default function App() {
                 {selectedOption === 'All' ? '全聯盟啦啦隊主場勝率排行' : `${selectedOption} 啦啦隊主場勝率排行`}
               </h3>
               <div className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">
-                計算方式為主場勝場數除以總場次（不含延賽，至少參與 5 場）
+                計算方式為主場勝場數除以總場次（至少參與 5 場）
               </div>
 
               {cheerleaderStats.length === 0 ? (
