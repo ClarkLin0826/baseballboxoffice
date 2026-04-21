@@ -61,6 +61,21 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [loadingTextIndex, setLoadingTextIndex] = useState(0);
 
+  // Sync PWA theme colors to match the header exactly to prevent Android white line glitches
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.style.backgroundColor = '#1e293b'; // Matches header dark:bg-slate-800
+      document.documentElement.style.backgroundColor = '#1e293b';
+      document.getElementById('theme-color-meta')?.setAttribute('content', '#1e293b');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.style.backgroundColor = '#1d4ed8'; // Matches header bg-blue-700
+      document.documentElement.style.backgroundColor = '#1d4ed8';
+      document.getElementById('theme-color-meta')?.setAttribute('content', '#1d4ed8');
+    }
+  }, [darkMode]);
+
   // Rotate loading text
   useEffect(() => {
     let interval: NodeJS.Timeout;
