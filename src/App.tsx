@@ -46,6 +46,7 @@ export default function App() {
   const [selectedThemeFilter, setSelectedThemeFilter] = useState<string>(searchParams.get('theme') || 'All');
   const [selectedCheerleader, setSelectedCheerleader] = useState<string>(searchParams.get('cheer') || 'All');
   const [selectedGameType, setSelectedGameType] = useState<string>(searchParams.get('gtype') || 'All');
+  const [selectedGameLimit, setSelectedGameLimit] = useState<string>(searchParams.get('limit') || '');
   const [showNextWeek, setShowNextWeek] = useState(searchParams.get('nw') === 'true');
   const [sortMode, setSortMode] = useState<SortMode>((searchParams.get('sort') as SortMode) || 'date');
   
@@ -154,12 +155,13 @@ export default function App() {
     if (selectedThemeFilter !== 'All') params.set('theme', selectedThemeFilter);
     if (selectedCheerleader !== 'All') params.set('cheer', selectedCheerleader);
     if (selectedGameType !== 'All') params.set('gtype', selectedGameType);
+    if (selectedGameLimit !== '') params.set('limit', selectedGameLimit);
     if (showNextWeek) params.set('nw', 'true');
     if (sortMode !== 'date') params.set('sort', sortMode);
     
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState({}, '', newUrl);
-  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, showNextWeek, sortMode, isFirstLoad]);
+  }, [viewMode, selectedOption, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, selectedGameLimit, showNextWeek, sortMode, isFirstLoad]);
 
   // Default to system preference if we don't have a saved one
   useEffect(() => {
@@ -184,6 +186,7 @@ export default function App() {
     setSelectedThemeFilter('All');
     setSelectedCheerleader('All');
     setSelectedGameType('All');
+    setSelectedGameLimit('');
     setSelectedOption(''); // Reset selected option to trigger auto-select
     if (viewMode === 'matchup' || viewMode === 'cheerleaderWinRate') {
       setShowNextWeek(false);
@@ -648,6 +651,31 @@ export default function App() {
       return true;
     });
 
+    if (selectedGameLimit !== '' && selectedGameLimit !== 'All') {
+      const limit = parseInt(selectedGameLimit, 10);
+      if (!isNaN(limit) && limit > 0) {
+        const byYear: Record<string, GameData[]> = {};
+        filtered.forEach(g => {
+          const year = g.Date.split('/')[0];
+          if (!byYear[year]) byYear[year] = [];
+          byYear[year].push(g);
+        });
+        filtered = [];
+        Object.keys(byYear).sort().forEach(year => {
+          byYear[year].sort((a, b) => {
+            const timeDiff = new Date(a.Date).getTime() - new Date(b.Date).getTime();
+            if (timeDiff === 0) {
+              const snoA = isNaN(Number(a.GameSno)) ? 0 : Number(a.GameSno);
+              const snoB = isNaN(Number(b.GameSno)) ? 0 : Number(b.GameSno);
+              return snoA - snoB;
+            }
+            return timeDiff;
+          });
+          filtered.push(...byYear[year].slice(0, limit));
+        });
+      }
+    }
+
     filtered = [...filtered].sort((a, b) => {
       switch (sortMode) {
         case 'winRateDesc': {
@@ -684,10 +712,10 @@ export default function App() {
     });
 
     return filtered;
-  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, showNextWeek]);
+  }, [rawData, viewMode, selectedOption, sortMode, startYear, endYear, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, selectedGameLimit, showNextWeek]);
 
   const dataForYoY = useMemo(() => {
-    return rawData.filter(game => {
+    let filtered = rawData.filter(game => {
       if (!game.Date) return false;
       if (showNextWeek) return false; // YoY doesn't apply to future weeks
 
@@ -721,7 +749,34 @@ export default function App() {
 
       return true;
     });
-  }, [rawData, viewMode, selectedOption, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, showNextWeek]);
+
+    if (selectedGameLimit !== '' && selectedGameLimit !== 'All') {
+      const limit = parseInt(selectedGameLimit, 10);
+      if (!isNaN(limit) && limit > 0) {
+        const byYear: Record<string, GameData[]> = {};
+        filtered.forEach(g => {
+          const year = g.Date.split('/')[0];
+          if (!byYear[year]) byYear[year] = [];
+          byYear[year].push(g);
+        });
+        filtered = [];
+        Object.keys(byYear).sort().forEach(year => {
+          byYear[year].sort((a, b) => {
+            const timeDiff = new Date(a.Date).getTime() - new Date(b.Date).getTime();
+            if (timeDiff === 0) {
+              const snoA = isNaN(Number(a.GameSno)) ? 0 : Number(a.GameSno);
+              const snoB = isNaN(Number(b.GameSno)) ? 0 : Number(b.GameSno);
+              return snoA - snoB;
+            }
+            return timeDiff;
+          });
+          filtered.push(...byYear[year].slice(0, limit));
+        });
+      }
+    }
+
+    return filtered;
+  }, [rawData, viewMode, selectedOption, selectedStadiumFilter, selectedDayOfWeek, selectedThemeFilter, selectedCheerleader, selectedGameType, selectedGameLimit, showNextWeek]);
 
   const yearlyStats = useMemo(() => {
     if (dataForYoY.length === 0) return [];
@@ -1464,6 +1519,20 @@ export default function App() {
             </select>
           </div>
 
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center justify-between">
+              <span>各年度場數限制</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={selectedGameLimit}
+              onChange={(e) => setSelectedGameLimit(e.target.value)}
+              placeholder="留空顯示全部"
+              className="w-full p-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 dark:text-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none placeholder:text-gray-400"
+            />
+          </div>
+
           {(viewMode === 'homeTeam' || viewMode === 'cheerleaderWinRate') && (
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">選擇啦啦隊</label>
@@ -1593,6 +1662,7 @@ export default function App() {
                   {selectedThemeFilter === 'ThemeOnly' && <span>⭐ 僅主題日</span>}
                   {selectedThemeFilter === 'NormalOnly' && <span>⚾ 僅無主題例行賽</span>}
                   {selectedGameType !== 'All' && <span>🏆 {selectedGameType === 'Playoff' ? '僅季後賽' : selectedGameType}</span>}
+                  {selectedGameLimit !== '' && <span>🔝 各年度前 {selectedGameLimit} 場</span>}
                   {selectedCheerleader !== 'All' && <span>💃 {selectedCheerleader}</span>}
                 </div>
               </div>
